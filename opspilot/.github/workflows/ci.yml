@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: lint, typecheck, test ─────────────────────────────────────────
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry==1.8.3
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Lint (ruff)
+        run: poetry run ruff check app tests
+
+      - name: Type check (mypy)
+        run: poetry run mypy app
+
+      - name: Run tests
+        run: poetry run pytest --cov=app --cov-report=xml
+        env:
+          USE_MOCK_TOOLS: "true"
+          AZURE_OPENAI_ENDPOINT: "https://placeholder.openai.azure.com/"
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage.xml
+
+  # ── Frontend: lint, typecheck, build ────────────────────────────────────────
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: "http://localhost:8000"
+
+  # ── Infrastructure: validate Bicep ──────────────────────────────────────────
+  infra-validate:
+    name: Bicep Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Azure CLI
+        run: curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      - name: Bicep build (validate syntax)
+        run: az bicep build --file infra/bicep/main.bicep

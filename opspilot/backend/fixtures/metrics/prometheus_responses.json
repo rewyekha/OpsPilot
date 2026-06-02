@@ -1,0 +1,57 @@
+{
+  "_comment": "Realistic Prometheus metric fixture for the checkout service failure scenario.",
+  "_purpose": "Returned by MetricsTool.query_prometheus() when USE_MOCK_TOOLS=true",
+
+  "checkout_svc_error_rate": {
+    "metric": "http_request_errors_total",
+    "service": "checkout-svc",
+    "data_points": [
+      { "timestamp": "2024-11-29T14:15:00Z", "value": 0.2 },
+      { "timestamp": "2024-11-29T14:16:00Z", "value": 0.3 },
+      { "timestamp": "2024-11-29T14:17:00Z", "value": 0.4 },
+      { "timestamp": "2024-11-29T14:18:00Z", "value": 0.5 },
+      { "timestamp": "2024-11-29T14:19:00Z", "value": 1.2 },
+      { "timestamp": "2024-11-29T14:20:00Z", "value": 8.7 },
+      { "timestamp": "2024-11-29T14:21:00Z", "value": 24.3 },
+      { "timestamp": "2024-11-29T14:22:00Z", "value": 41.8 },
+      { "timestamp": "2024-11-29T14:23:00Z", "value": 58.2 },
+      { "timestamp": "2024-11-29T14:24:00Z", "value": 62.1 }
+    ],
+    "anomaly_detected": true,
+    "anomaly_start": "2024-11-29T14:19:00Z",
+    "baseline_p99": 0.5
+  },
+
+  "checkout_svc_p99_latency_ms": {
+    "metric": "http_request_duration_p99",
+    "service": "checkout-svc",
+    "data_points": [
+      { "timestamp": "2024-11-29T14:15:00Z", "value": 180 },
+      { "timestamp": "2024-11-29T14:18:00Z", "value": 210 },
+      { "timestamp": "2024-11-29T14:19:00Z", "value": 1840 },
+      { "timestamp": "2024-11-29T14:20:00Z", "value": 5200 },
+      { "timestamp": "2024-11-29T14:21:00Z", "value": 8200 },
+      { "timestamp": "2024-11-29T14:22:00Z", "value": 9100 },
+      { "timestamp": "2024-11-29T14:23:00Z", "value": 9500 }
+    ],
+    "anomaly_detected": true,
+    "anomaly_start": "2024-11-29T14:19:00Z",
+    "baseline_p99": 220
+  },
+
+  "db_connection_pool_active": {
+    "metric": "db_connections_active",
+    "service": "checkout-svc",
+    "data_points": [
+      { "timestamp": "2024-11-29T14:15:00Z", "value": 4 },
+      { "timestamp": "2024-11-29T14:18:00Z", "value": 8 },
+      { "timestamp": "2024-11-29T14:19:00Z", "value": 10 },
+      { "timestamp": "2024-11-29T14:20:00Z", "value": 10 },
+      { "timestamp": "2024-11-29T14:21:00Z", "value": 10 },
+      { "timestamp": "2024-11-29T14:22:00Z", "value": 10 }
+    ],
+    "_note": "Pool maxed at 10 — the misconfigured limit. Previously was 50.",
+    "anomaly_detected": true,
+    "anomaly_start": "2024-11-29T14:19:00Z"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "_comment": "Realistic Log Analytics fixture for the checkout service failure scenario.",
+  "_purpose": "Returned by LogsTool.search_errors() when USE_MOCK_TOOLS=true",
+
+  "checkout_svc_errors": [
+    {
+      "timestamp": "2024-11-29T14:19:08Z",
+      "level": "ERROR",
+      "service": "checkout-svc",
+      "pod": "checkout-svc-7d9f8b-xk2p4",
+      "message": "HikariPool-1 - Connection is not available, request timed out after 30000ms",
+      "exception": "com.zaxxer.hikari.pool.HikariPool$PoolInitializationException",
+      "stack_trace": "at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:213)\n  at checkout.service.OrderService.createOrder(OrderService.java:87)"
+    },
+    {
+      "timestamp": "2024-11-29T14:19:09Z",
+      "level": "ERROR",
+      "service": "checkout-svc",
+      "pod": "checkout-svc-7d9f8b-xk2p4",
+      "message": "HikariPool-1 - Connection is not available, request timed out after 30000ms",
+      "exception": "com.zaxxer.hikari.pool.HikariPool$PoolInitializationException",
+      "stack_trace": "at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:213)\n  at checkout.service.CartService.checkout(CartService.java:142)"
+    }
+  ],
+
+  "error_frequency": {
+    "error_type": "HikariPool$PoolInitializationException",
+    "first_occurrence": "2024-11-29T14:19:08Z",
+    "count_last_5_min": 847,
+    "rate_per_second": 2.82
+  }
+}

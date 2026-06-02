@@ -1,0 +1,71 @@
+name: CD — Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  id-token: write     # Required for OIDC authentication to Azure
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC — no stored secrets)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure (Bicep)
+        run: |
+          az deployment group create \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/parameters/${{ github.event.inputs.environment || 'dev' }}.bicepparam
+
+      - name: Build and push backend image
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build backend
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-api:${{ github.sha }} \
+            --target production ./backend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-api:${{ github.sha }}
+
+      - name: Build frontend
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-ui:${{ github.sha }} \
+            --target production ./frontend
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-ui:${{ github.sha }}
+
+      - name: Update Container Apps revisions
+        run: |
+          az containerapp update \
+            --name opspilot-api \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-api:${{ github.sha }}
+
+          az containerapp update \
+            --name opspilot-ui \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/opspilot-ui:${{ github.sha }}

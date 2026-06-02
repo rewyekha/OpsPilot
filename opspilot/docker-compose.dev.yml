@@ -1,0 +1,46 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src     # hot reload
+      - ./frontend/public:/app/public
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    networks:
+      - opspilot-dev-net
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app      # hot reload via uvicorn --reload
+      - ./backend/fixtures:/app/fixtures
+    env_file:
+      - .env
+    environment:
+      - USE_MOCK_TOOLS=true
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - redis
+    networks:
+      - opspilot-dev-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - opspilot-dev-net
+
+networks:
+  opspilot-dev-net:
+    driver: bridge

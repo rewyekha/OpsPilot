@@ -1,0 +1,38 @@
+{
+  "_comment": "Primary demo scenario: checkout service failure caused by DB connection pool exhaustion introduced in v2.4.1 deployment.",
+  "_purpose": "Used by DeploymentAgent and MetricsAgent tools when USE_MOCK_TOOLS=true",
+
+  "incident": {
+    "description": "Checkout service is failing. High error rate since 14:20 UTC.",
+    "affected_services": ["checkout-svc", "payment-svc", "order-svc"],
+    "reported_severity": "P1",
+    "reporter": "pagerduty-alert"
+  },
+
+  "deployments": [
+    {
+      "id": "deploy-20241129-001",
+      "service": "checkout-svc",
+      "version": "v2.4.1",
+      "deployed_at": "2024-11-29T14:18:00Z",
+      "deployed_by": "ci-service-account",
+      "pipeline_url": "https://dev.azure.com/contoso/opspilot/_build/results?buildId=4891",
+      "change_summary": "Upgraded ORM from v3.1.2 to v3.2.0. Updated connection pool configuration.",
+      "git_diff_summary": "orm_config.py: max_connections changed from 50 to 10 (regression in env var mapping)"
+    },
+    {
+      "id": "deploy-20241129-000",
+      "service": "payment-svc",
+      "version": "v1.9.3",
+      "deployed_at": "2024-11-29T09:45:00Z",
+      "deployed_by": "jane.doe@contoso.com",
+      "pipeline_url": "https://dev.azure.com/contoso/opspilot/_build/results?buildId=4877",
+      "change_summary": "Minor logging improvements. No functional changes.",
+      "git_diff_summary": "logging.py: added request_id to all log statements"
+    }
+  ],
+
+  "expected_root_cause": "DB connection pool limit reduced from 50 to 10 in checkout-svc v2.4.1 due to ORM configuration regression.",
+  "expected_confidence_min": 0.80,
+  "expected_primary_recommendation": "Roll back checkout-svc to v2.3.9"
+}

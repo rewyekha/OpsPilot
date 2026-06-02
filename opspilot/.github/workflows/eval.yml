@@ -1,0 +1,42 @@
+name: Foundry Evaluation
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"      # Weekly — every Monday at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  evaluate:
+    name: Run Foundry Evaluation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install poetry==1.8.3 && cd backend && poetry install
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run evaluation against golden dataset
+        run: python evaluation/run_eval.py
+        env:
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_AI_FOUNDRY_PROJECT_NAME: ${{ secrets.AZURE_AI_FOUNDRY_PROJECT_NAME }}
+          AZURE_AI_FOUNDRY_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: evaluation/results/
+          retention-days: 90
