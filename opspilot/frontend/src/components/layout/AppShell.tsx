@@ -3,6 +3,8 @@ import { makeStyles, tokens, Button } from '@fluentui/react-components'
 import { AddRegular } from '@fluentui/react-icons'
 import { NavBar } from './NavBar'
 import { SideNav } from './SideNav'
+import { IncidentPanel } from '../incident/IncidentPanel'
+import { AgentActivityPanel } from '../agents/AgentActivityPanel'
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
@@ -84,7 +86,12 @@ export const AppShell: React.FC = () => {
           onNavigate={setActivePage}
         />
         <main className={styles.main}>
-          <PagePlaceholder label={PAGE_LABELS[activePage] ?? activePage} />
+          {activePage === 'incidents'
+            ? <IncidentPanel />
+            : activePage === 'agents'
+              ? <AgentActivityPanel />
+              : <PagePlaceholder label={PAGE_LABELS[activePage] ?? activePage} />
+          }
         </main>
       </div>
     </div>
