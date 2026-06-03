@@ -4,6 +4,9 @@ import {
   useActiveIncidentWithRecommendations,
   type IncidentWithRec,
 } from '../../hooks/useIncident'
+import { useSession } from '../../store/SessionContext'
+import { IncidentStatusBadge } from '../shared/SeverityBadge'
+import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -494,6 +497,7 @@ const ServiceChip: React.FC<{ svc: AffectedService }> = ({ svc }) => {
 export const IncidentPanel: React.FC = () => {
   const s = useStyles()
   const { data, loading, error } = useActiveIncidentWithRecommendations()
+  const { incidentStatus } = useSession()
 
   // Trigger bar fill animations after first paint
   const [mounted, setMounted] = useState(false)
@@ -548,10 +552,7 @@ export const IncidentPanel: React.FC = () => {
           <div className={s.header}>
             {/* Status chip + Incident ID */}
             <div className={s.headerTopRow}>
-              <div className={s.statusChip}>
-                <div className={s.statusDot} />
-                <span className={s.statusText}>{incident.statusLabel.toUpperCase()}</span>
-              </div>
+              <IncidentStatusBadge status={incidentStatus(ACTIVE_INCIDENT_ID)} />
               <span className={s.incidentId}>{incident.id}</span>
             </div>
 

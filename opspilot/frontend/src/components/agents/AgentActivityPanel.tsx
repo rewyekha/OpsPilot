@@ -11,6 +11,9 @@ import { useAgentActivity } from '../../hooks/useAgentActivity'
 import type { ApiAgentTask, ApiAgentActivityResponse } from '../../api/agents'
 import { useIncidentStream } from '../../hooks/useIncidentStream'
 import { StreamStatusBadge } from '../shared/StreamStatusBadge'
+import { IncidentStatusBadge } from '../shared/SeverityBadge'
+import { useSession } from '../../store/SessionContext'
+import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
 
 // ── Local types ────────────────────────────────────────────────────────────────
 
@@ -596,6 +599,7 @@ export const AgentActivityPanel: React.FC = () => {
   const s = useStyles()
   const { data, loading, error } = useAgentActivity('INC-2024-0847')
   const { status: streamStatus, lastEvent } = useIncidentStream('INC-2024-0847')
+  const { incidentStatus } = useSession()
 
   // ── Live data — starts as the HTTP snapshot, patched by SSE ────────────────
   const [liveData, setLiveData] = useState<ApiAgentActivityResponse | null>(null)
@@ -697,7 +701,10 @@ export const AgentActivityPanel: React.FC = () => {
         <div className={s.panelHeader}>
           <div className={s.headerTopRow}>
             <span className={s.panelLabel}>Agent Investigation · {liveData.incident_id}</span>
-            <StreamStatusBadge status={streamStatus} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IncidentStatusBadge status={incidentStatus(ACTIVE_INCIDENT_ID)} />
+              <StreamStatusBadge status={streamStatus} />
+            </div>
           </div>
 
           <p className={s.incidentTitle}>{incidentTitle}</p>

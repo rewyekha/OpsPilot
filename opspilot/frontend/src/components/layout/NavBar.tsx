@@ -9,9 +9,20 @@ import {
   Popover,
   PopoverTrigger,
   PopoverSurface,
+  Menu,
+  MenuTrigger,
+  MenuPopover,
+  MenuList,
+  MenuItem,
   mergeClasses,
 } from '@fluentui/react-components'
-import { AlertRegular, CheckmarkCircleRegular } from '@fluentui/react-icons'
+import {
+  AlertRegular,
+  CheckmarkCircleRegular,
+  PersonRegular,
+  SignOutRegular,
+} from '@fluentui/react-icons'
+import { useNotify } from '../../store/NotificationContext'
 
 // ── Types & mock data ─────────────────────────────────────────────────────────────
 
@@ -271,6 +282,7 @@ const useStyles = makeStyles({
 
 export const NavBar: React.FC<NavBarProps> = ({ activePage, pageLabels }) => {
   const s = useStyles()
+  const notify = useNotify()
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS)
   const [open, setOpen] = useState(false)
 
@@ -401,13 +413,41 @@ export const NavBar: React.FC<NavBarProps> = ({ activePage, pageLabels }) => {
           )}
         </div>
 
-        {/* User avatar */}
-        <Avatar
-          name="M K"
-          size={28}
-          color="brand"
-          style={{ cursor: 'pointer', marginLeft: '4px' }}
-        />
+        {/* User avatar menu */}
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <button
+              aria-label="User menu"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                marginLeft: '4px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                borderRadius: '50%',
+              }}
+            >
+              <Avatar name="M K" size={28} color="brand" />
+            </button>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              <MenuItem
+                icon={<PersonRegular />}
+                onClick={() => notify({ title: 'Profile', body: 'Signed in as M K (demo)' })}
+              >
+                Profile
+              </MenuItem>
+              <MenuItem
+                icon={<SignOutRegular />}
+                onClick={() => notify({ title: 'Signed out', body: 'Demo session ended', intent: 'info' })}
+              >
+                Sign out
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
       </div>
     </header>
   )

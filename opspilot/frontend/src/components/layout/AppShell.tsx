@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { makeStyles, tokens, Button } from '@fluentui/react-components'
-import { AddRegular } from '@fluentui/react-icons'
+import { HomeRegular } from '@fluentui/react-icons'
 import { NavBar } from './NavBar'
 import { SideNav } from './SideNav'
+import { GlobalCommandBar } from '../command/GlobalCommandBar'
 import { IncidentPanel } from '../incident/IncidentPanel'
 import { AgentActivityPanel } from '../agents/AgentActivityPanel'
-import { InvestigationTimelinePanel } from '../timeline/InvestigationTimelinePanel'
+import { HistoryPanel } from '../history/HistoryPanel'
 import { RecommendationPanel } from '../recommendations/RecommendationPanel'
+import { useNotify } from '../../store/NotificationContext'
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
@@ -38,6 +40,11 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     background: 'radial-gradient(ellipse at 50% 35%, #0f2244 0%, #0a1628 65%)',
+  },
+  pageContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1',
   },
   placeholder: {
     display: 'flex',
@@ -72,13 +79,23 @@ const useStyles = makeStyles({
 
 export const AppShell: React.FC = () => {
   const styles = useStyles()
+  const notify = useNotify()
   const [isNavCollapsed, setIsNavCollapsed] = useState(false)
   const [activePage, setActivePage] = useState('home')
+  // Bumping this remounts the active panel, which re-runs its data hooks —
+  // i.e. a real refresh of agent statuses, confidence, and timeline.
+  const [refreshNonce, setRefreshNonce] = useState(0)
+
+  const handleRefresh = useCallback(() => {
+    setRefreshNonce((n) => n + 1)
+    notify({ title: 'Refreshing analysis', body: 'Re-running agent investigation…', intent: 'info' })
+  }, [notify])
 
   return (
     <div className={styles.root}>
       <div className={styles.topBar}>
         <NavBar activePage={activePage} pageLabels={PAGE_LABELS} />
+        <GlobalCommandBar onNavigate={setActivePage} onRefresh={handleRefresh} />
       </div>
       <div className={styles.body}>
         <SideNav
@@ -88,37 +105,46 @@ export const AppShell: React.FC = () => {
           onNavigate={setActivePage}
         />
         <main className={styles.main}>
-          {activePage === 'incidents'
-            ? <IncidentPanel />
-            : activePage === 'agents'
-              ? <AgentActivityPanel />
-              : activePage === 'history'
-                ? <InvestigationTimelinePanel />
-                : activePage === 'home'
-                  ? <RecommendationPanel />
-                  : <PagePlaceholder label={PAGE_LABELS[activePage] ?? activePage} />
-          }
+          {/* key forces a remount on refresh so data hooks re-fetch */}
+          <div className={styles.pageContent} key={refreshNonce}>
+            {activePage === 'incidents'
+              ? <IncidentPanel />
+              : activePage === 'agents'
+                ? <AgentActivityPanel />
+                : activePage === 'history'
+                  ? <HistoryPanel />
+                  : activePage === 'home'
+                    ? <RecommendationPanel />
+                    : <PagePlaceholder
+                        label={PAGE_LABELS[activePage] ?? activePage}
+                        onNavigate={setActivePage}
+                      />
+            }
+          </div>
         </main>
       </div>
     </div>
   )
 }
 
-// Sprint 2: replace with real page components
-const PagePlaceholder: React.FC<{ label: string }> = ({ label }) => {
+const PagePlaceholder: React.FC<{ label: string; onNavigate: (page: string) => void }> = ({
+  label,
+  onNavigate,
+}) => {
   const styles = useStyles()
   return (
     <div className={styles.placeholder}>
       <div className={styles.hexMark} />
       <p className={styles.pageTitle}>{label}</p>
-      <p className={styles.pageSubtitle}>Feature panels activate in Sprint 2</p>
+      <p className={styles.pageSubtitle}>This workspace is not part of the current sprint.</p>
       <Button
-        icon={<AddRegular />}
+        icon={<HomeRegular />}
         appearance="primary"
         size="medium"
         style={{ marginTop: '12px' }}
+        onClick={() => onNavigate('home')}
       >
-        New Investigation
+        Back to Dashboard
       </Button>
     </div>
   )

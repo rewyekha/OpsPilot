@@ -4,6 +4,7 @@ import { useTimeline } from '../../hooks/useTimeline'
 import type { ApiTimelineEvent } from '../../api/timeline'
 import { useIncidentStream } from '../../hooks/useIncidentStream'
 import { StreamStatusBadge } from '../shared/StreamStatusBadge'
+import { useSession, type SessionTimelineEvent } from '../../store/SessionContext'
 
 // ── Local types ────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,28 @@ function mapApiEvent(e: ApiTimelineEvent): TimelineEvent {
     source: e.agent_role ? (AGENT_ROLE_NAMES[e.agent_role] ?? e.type_label) : e.type_label,
     confidence: e.confidence,
     isKeyEvent: e.is_key_event,
+  }
+}
+
+// Session (operator-initiated) events overlay onto the same timeline.
+const SESSION_KIND_TYPE: Record<SessionTimelineEvent['kind'], TimelineEventType> = {
+  action_submitted: 'deployment',
+  action_succeeded: 'deployment',
+  action_failed: 'incident',
+  investigation_created: 'detection',
+  state_transition: 'correlation',
+}
+
+function mapSessionEvent(e: SessionTimelineEvent): TimelineEvent {
+  return {
+    id: e.id,
+    timestamp: formatUtcTimestamp(e.timestamp),
+    type: SESSION_KIND_TYPE[e.kind],
+    title: e.title,
+    description: e.description,
+    source: e.source,
+    confidence: e.confidence,
+    isKeyEvent: e.kind === 'action_succeeded',
   }
 }
 
@@ -525,6 +548,7 @@ export const InvestigationTimelinePanel: React.FC = () => {
   const s = useStyles()
   const { data, loading, error } = useTimeline('INC-2024-0847')
   const { status: streamStatus, lastEvent } = useIncidentStream('INC-2024-0847')
+  const { timelineEvents: sessionEvents } = useSession()
 
   // ── Live event list — starts as the HTTP snapshot, new events appended by SSE
   const [liveEvents, setLiveEvents] = useState<TimelineEvent[]>([])
@@ -636,7 +660,9 @@ export const InvestigationTimelinePanel: React.FC = () => {
     )
   }
 
-  const events = liveEvents
+  // Operator-initiated session events (executions, new investigations) overlay
+  // onto the API/SSE timeline so the view updates immediately after execution.
+  const events = [...liveEvents, ...sessionEvents.map(mapSessionEvent)]
   const byType = (t: TimelineEventType) => events.filter((e) => e.type === t).length
 
   // Build time range string from first/last events
