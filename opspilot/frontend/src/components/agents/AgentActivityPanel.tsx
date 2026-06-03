@@ -7,12 +7,73 @@ import {
   RocketRegular,
   HistoryRegular,
 } from '@fluentui/react-icons'
-import {
-  MOCK_AGENT_ACTIVITIES,
-  type AgentActivity,
-  type AgentRole,
-  type AgentStatus,
-} from '../../data/mockAgentActivity'
+import { useAgentActivity } from '../../hooks/useAgentActivity'
+import type { ApiAgentTask, ApiAgentActivityResponse } from '../../api/agents'
+import { useIncidentStream } from '../../hooks/useIncidentStream'
+import { StreamStatusBadge } from '../shared/StreamStatusBadge'
+
+// ── Local types ────────────────────────────────────────────────────────────────
+
+type AgentRole = 'commander' | 'metrics' | 'logs' | 'deployment' | 'time_machine'
+type AgentStatus = 'completed' | 'running' | 'waiting'
+
+interface AgentActivity {
+  id: AgentRole
+  name: string
+  role: string
+  status: AgentStatus
+  startedAt: string
+  completedAt: string | undefined
+  durationLabel: string | undefined
+  findings: string
+  confidence: number
+}
+
+// ── Mapping helpers ────────────────────────────────────────────────────────────
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  commander:    'Incident Triage & Orchestration',
+  metrics:      'APM & Infrastructure Telemetry',
+  logs:         'Log Analytics & Pattern Recognition',
+  deployment:   'Change Intelligence & Release Analysis',
+  time_machine: 'Historical Baseline & Anomaly Correlation',
+}
+
+function formatUtcTime(iso: string): string {
+  const d = new Date(iso)
+  const hh = String(d.getUTCHours()).padStart(2, '0')
+  const mm = String(d.getUTCMinutes()).padStart(2, '0')
+  const ss = String(d.getUTCSeconds()).padStart(2, '0')
+  return `${hh}:${mm}:${ss}`
+}
+
+function formatSeconds(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)}s`
+  const m = Math.floor(sec / 60)
+  const s = Math.round(sec % 60)
+  return s > 0 ? `${m}m ${s}s` : `${m}m`
+}
+
+function normaliseStatus(s: string): AgentStatus {
+  if (s === 'completed') return 'completed'
+  if (s === 'running') return 'running'
+  return 'waiting'
+}
+
+function mapTask(task: ApiAgentTask): AgentActivity {
+  return {
+    id: task.role as AgentRole,
+    name: `${task.role_label} Agent`,
+    role: ROLE_DESCRIPTIONS[task.role] ?? task.role_label,
+    status: normaliseStatus(task.status),
+    startedAt: task.started_at ? formatUtcTime(task.started_at) : '--:--:--',
+    completedAt: task.completed_at ? formatUtcTime(task.completed_at) : undefined,
+    durationLabel:
+      task.duration_seconds != null ? formatSeconds(task.duration_seconds) : undefined,
+    findings: task.finding,
+    confidence: task.confidence,
+  }
+}
 
 // ── Display configuration per status ─────────────────────────────────────────
 
@@ -351,6 +412,61 @@ const useStyles = makeStyles({
     textAlign: 'right',
     flexShrink: 0,
   },
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  skeletonLine: {
+    height: '13px',
+    borderRadius: '4px',
+    backgroundColor: tokens.colorNeutralBackground4,
+    animationName: 'ops-status-pulse',
+    animationDuration: '1.8s',
+    animationTimingFunction: 'ease-in-out',
+    animationIterationCount: 'infinite',
+  },
+  skeletonBlock: {
+    height: '80px',
+    borderRadius: '6px',
+    backgroundColor: tokens.colorNeutralBackground4,
+    animationName: 'ops-status-pulse',
+    animationDuration: '1.8s',
+    animationTimingFunction: 'ease-in-out',
+    animationIterationCount: 'infinite',
+  },
+
+  // ── Error card ──────────────────────────────────────────────────────────────
+  errorCard: {
+    position: 'relative',
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRadius: '8px',
+    overflow: 'hidden',
+    boxShadow: `0 0 0 1px rgba(220, 38, 38, 0.35), 0 4px 24px rgba(0, 0, 0, 0.3)`,
+  },
+  errorAccent: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    bottom: '0',
+    width: '4px',
+    backgroundColor: '#dc2626',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+  errorContent: {
+    padding: '20px 20px 20px 24px',
+  },
+  errorTitle: {
+    margin: '0 0 6px 0',
+    padding: '0',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#f87171',
+  },
+  errorMessage: {
+    margin: '0',
+    padding: '0',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground3,
+  },
 })
 
 // ── AgentRow ──────────────────────────────────────────────────────────────────
@@ -478,17 +594,101 @@ const AgentRow: React.FC<{ activity: AgentActivity; mounted: boolean }> = ({
 
 export const AgentActivityPanel: React.FC = () => {
   const s = useStyles()
-  const [mounted, setMounted] = useState(false)
+  const { data, loading, error } = useAgentActivity('INC-2024-0847')
+  const { status: streamStatus, lastEvent } = useIncidentStream('INC-2024-0847')
 
+  // ── Live data — starts as the HTTP snapshot, patched by SSE ────────────────
+  const [liveData, setLiveData] = useState<ApiAgentActivityResponse | null>(null)
+
+  useEffect(() => {
+    if (data) setLiveData(data)
+  }, [data])
+
+  useEffect(() => {
+    if (!lastEvent) return
+    setLiveData((prev) => {
+      if (!prev) return prev
+
+      if (lastEvent.event_type === 'agent.started') {
+        return {
+          ...prev,
+          running: prev.running + 1,
+          waiting: Math.max(0, prev.waiting - 1),
+          agents: prev.agents.map((a) =>
+            a.role === lastEvent.agent_name
+              ? { ...a, status: 'running', started_at: lastEvent.timestamp }
+              : a,
+          ),
+        }
+      }
+
+      if (lastEvent.event_type === 'agent.finding') {
+        const confidence = lastEvent.payload.confidence as number | undefined
+        if (confidence === undefined) return prev
+        return {
+          ...prev,
+          agents: prev.agents.map((a) =>
+            a.role === lastEvent.agent_name ? { ...a, confidence } : a,
+          ),
+        }
+      }
+
+      if (lastEvent.event_type === 'agent.completed') {
+        return {
+          ...prev,
+          running: Math.max(0, prev.running - 1),
+          completed: prev.completed + 1,
+          agents: prev.agents.map((a) =>
+            a.role === lastEvent.agent_name
+              ? { ...a, status: 'completed', completed_at: lastEvent.timestamp }
+              : a,
+          ),
+        }
+      }
+
+      return prev
+    })
+  }, [lastEvent])
+
+  const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(id)
   }, [])
 
-  const activities = MOCK_AGENT_ACTIVITIES
-  const completed = activities.filter((a) => a.status === 'completed').length
-  const running   = activities.filter((a) => a.status === 'running').length
-  const waiting   = activities.filter((a) => a.status === 'waiting').length
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className={s.page}>
+        <div className={s.panel} style={{ padding: '18px 20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className={s.skeletonLine} style={{ width: '50%' }} />
+            <div className={s.skeletonLine} style={{ width: '35%' }} />
+            <div className={s.skeletonBlock} />
+            <div className={s.skeletonBlock} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (error || !liveData) {
+    return (
+      <div className={s.page}>
+        <div className={s.errorCard}>
+          <div className={s.errorAccent} />
+          <div className={s.errorContent}>
+            <p className={s.errorTitle}>Failed to load agent activity</p>
+            <p className={s.errorMessage}>{error ?? 'No data available'}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const activities = liveData.agents.map(mapTask)
+  const incidentTitle = 'Checkout Service Failure'
 
   return (
     <div className={s.page}>
@@ -496,34 +696,31 @@ export const AgentActivityPanel: React.FC = () => {
         {/* ── Panel header ─────────────────────────────────────────────── */}
         <div className={s.panelHeader}>
           <div className={s.headerTopRow}>
-            <span className={s.panelLabel}>Agent Investigation · INC-2024-0847</span>
-            <div className={s.liveChip}>
-              <div className={s.liveDot} />
-              <span className={s.liveText}>LIVE</span>
-            </div>
+            <span className={s.panelLabel}>Agent Investigation · {liveData.incident_id}</span>
+            <StreamStatusBadge status={streamStatus} />
           </div>
 
-          <p className={s.incidentTitle}>Checkout Service Failure</p>
+          <p className={s.incidentTitle}>{incidentTitle}</p>
 
           {/* Summary stats */}
           <div className={s.statsRow}>
             <div className={s.statItem}>
-              <span className={s.statValue}>{activities.length}</span>
+              <span className={s.statValue}>{liveData.total_dispatched}</span>
               <span className={s.statLabel}>Dispatched</span>
             </div>
             <div className={s.statDivider} />
             <div className={s.statItem}>
-              <span className={mergeClasses(s.statValue, s.statCompleted)}>{completed}</span>
+              <span className={mergeClasses(s.statValue, s.statCompleted)}>{liveData.completed}</span>
               <span className={s.statLabel}>Completed</span>
             </div>
             <div className={s.statDivider} />
             <div className={s.statItem}>
-              <span className={mergeClasses(s.statValue, s.statRunning)}>{running}</span>
+              <span className={mergeClasses(s.statValue, s.statRunning)}>{liveData.running}</span>
               <span className={s.statLabel}>Running</span>
             </div>
             <div className={s.statDivider} />
             <div className={s.statItem}>
-              <span className={s.statValue}>{waiting}</span>
+              <span className={s.statValue}>{liveData.waiting}</span>
               <span className={s.statLabel}>Waiting</span>
             </div>
           </div>

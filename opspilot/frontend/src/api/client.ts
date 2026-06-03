@@ -1,10 +1,21 @@
-// Typed API client
-// All HTTP calls go through this client, which attaches auth headers
-// and base URL from environment variables.
-// Error responses are parsed into typed ApiError objects — never raw fetch errors.
+const BASE_URL = 'http://localhost:8000'
 
-export interface ApiError {
+export class ApiError extends Error {
   status: number
-  message: string
-  detail?: unknown
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+export async function apiFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }))
+    const msg: string =
+      body && typeof body.detail === 'string' ? body.detail : res.statusText
+    throw new ApiError(res.status, msg)
+  }
+  return res.json() as Promise<T>
 }

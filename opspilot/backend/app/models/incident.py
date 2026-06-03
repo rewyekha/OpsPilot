@@ -45,3 +45,4 @@ class IncidentRecord(BaseModel):
     updated_at: datetime
     resolved_at: datetime | None = None
     langgraph_run_id: str | None = None     # links to LangGraph checkpoint
+    error_rate_pct: float | None = None     # current service error rate (0-100)

@@ -1,23 +1,23 @@
-// Incident API calls
-// Wraps /api/incidents endpoints. Used by React Query hooks in hooks/useIncident.ts
+import { apiFetch } from './client'
 
-import type { CreateIncidentRequest, IncidentRecord } from '@/types/incident'
-
-export type { CreateIncidentRequest, IncidentRecord }
+export interface ApiIncidentRecord {
+  id: string
+  description: string
+  status: string
+  severity: string
+  affected_services: string[]
+  reporter: string
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+  langgraph_run_id: string | null
+  error_rate_pct: number | null
+}
 
 export const incidentApi = {
-  /** POST /api/incidents — create and begin investigation */
-  create: (_req: CreateIncidentRequest): Promise<IncidentRecord> => {
-    throw new Error('Not implemented — Sprint 2')
-  },
+  getActive: (): Promise<ApiIncidentRecord[]> =>
+    apiFetch<ApiIncidentRecord[]>('/api/incidents/active'),
 
-  /** GET /api/incidents — paginated list */
-  list: (_page?: number): Promise<IncidentRecord[]> => {
-    throw new Error('Not implemented — Sprint 2')
-  },
-
-  /** GET /api/incidents/:id — single incident with full findings */
-  get: (_id: string): Promise<IncidentRecord> => {
-    throw new Error('Not implemented — Sprint 2')
-  },
+  getById: (id: string): Promise<ApiIncidentRecord> =>
+    apiFetch<ApiIncidentRecord>(`/api/incidents/${encodeURIComponent(id)}`),
 }

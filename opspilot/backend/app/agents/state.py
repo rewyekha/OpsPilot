@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Annotated, Any
 
 from langgraph.graph.message import add_messages
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Severity(str, Enum):
@@ -76,6 +76,8 @@ class Recommendation(BaseModel):
 class OpsPilotState(BaseModel):
     """Full investigation state. Passed through every LangGraph node."""
 
+    model_config = ConfigDict(frozen=False, arbitrary_types_allowed=True)
+
     # ── Input ────────────────────────────────────────────────────────────────
     incident_id: str
     incident_description: str
@@ -89,7 +91,7 @@ class OpsPilotState(BaseModel):
     infra_findings: dict[str, Any] | None = None
 
     # ── Synthesized outputs (set by Commander during synthesis) ─────────────
-    timeline: list[TimelineEvent] = Field(default_factory=list)
+    timeline: list[Any] = Field(default_factory=list)  # list[TimelineEvent] or raw dicts
     root_cause: RootCauseAssessment | None = None
     blast_radius: BlastRadiusAssessment | None = None
     recommendations: list[Recommendation] = Field(default_factory=list)

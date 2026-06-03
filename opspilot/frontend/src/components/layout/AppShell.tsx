@@ -5,6 +5,8 @@ import { NavBar } from './NavBar'
 import { SideNav } from './SideNav'
 import { IncidentPanel } from '../incident/IncidentPanel'
 import { AgentActivityPanel } from '../agents/AgentActivityPanel'
+import { InvestigationTimelinePanel } from '../timeline/InvestigationTimelinePanel'
+import { RecommendationPanel } from '../recommendations/RecommendationPanel'
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
@@ -71,7 +73,7 @@ const useStyles = makeStyles({
 export const AppShell: React.FC = () => {
   const styles = useStyles()
   const [isNavCollapsed, setIsNavCollapsed] = useState(false)
-  const [activePage, setActivePage] = useState('incidents')
+  const [activePage, setActivePage] = useState('home')
 
   return (
     <div className={styles.root}>
@@ -90,7 +92,11 @@ export const AppShell: React.FC = () => {
             ? <IncidentPanel />
             : activePage === 'agents'
               ? <AgentActivityPanel />
-              : <PagePlaceholder label={PAGE_LABELS[activePage] ?? activePage} />
+              : activePage === 'history'
+                ? <InvestigationTimelinePanel />
+                : activePage === 'home'
+                  ? <RecommendationPanel />
+                  : <PagePlaceholder label={PAGE_LABELS[activePage] ?? activePage} />
           }
         </main>
       </div>

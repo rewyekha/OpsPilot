@@ -1,6 +1,105 @@
 import React, { useState, useEffect } from 'react'
 import { makeStyles, tokens, mergeClasses, shorthands } from '@fluentui/react-components'
-import { MOCK_INCIDENT, type AffectedService } from '../../data/mockIncident'
+import {
+  useActiveIncidentWithRecommendations,
+  type IncidentWithRec,
+} from '../../hooks/useIncident'
+
+// ── Local types ───────────────────────────────────────────────────────────────
+
+export interface AffectedService {
+  name: string
+  status: 'critical' | 'degraded' | 'healthy'
+}
+
+interface IncidentDisplay {
+  id: string
+  title: string
+  description: string
+  severity: string
+  severityLabel: string
+  status: string
+  statusLabel: string
+  startedDisplay: string
+  investigationDuration: string
+  affectedServices: AffectedService[]
+  confidence: number
+  blastRadius: number
+  affectedUsers: number
+  errorRate: number
+  businessImpactPerHour: number
+}
+
+// ── Data mapping helpers ───────────────────────────────────────────────────────
+
+const SEVERITY_LABEL: Record<string, string> = {
+  P0: 'OUTAGE',
+  P1: 'CRITICAL',
+  P2: 'HIGH',
+  P3: 'MEDIUM',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Open',
+  investigating: 'Investigating',
+  mitigated: 'Mitigated',
+  resolved: 'Resolved',
+  post_mortem: 'Post-Mortem',
+}
+
+function formatUtcDisplay(iso: string): string {
+  const d = new Date(iso)
+  const day = d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+  const hh = String(d.getUTCHours()).padStart(2, '0')
+  const mm = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${day} · ${hh}:${mm} UTC`
+}
+
+function formatDuration(startIso: string, endIso: string): string {
+  const diffMs = new Date(endIso).getTime() - new Date(startIso).getTime()
+  const total = Math.max(0, Math.floor(diffMs / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':')
+}
+
+function mapToDisplay(d: IncidentWithRec): IncidentDisplay {
+  const { incident, recommendations } = d
+  const rc = recommendations?.root_cause
+
+  // Derive a short title from the first sentence of description
+  const title =
+    incident.description.split(/\.\s/)[0].replace(/\.$/, '') ||
+    `Incident ${incident.id}`
+
+  // Map affected_services: first is critical, rest are degraded
+  const affectedServices: AffectedService[] = incident.affected_services.map(
+    (name, idx) => ({ name, status: idx === 0 ? 'critical' : 'degraded' }),
+  )
+
+  return {
+    id: incident.id,
+    title,
+    description: incident.description,
+    severity: incident.severity,
+    severityLabel: SEVERITY_LABEL[incident.severity] ?? incident.severity,
+    status: incident.status,
+    statusLabel: STATUS_LABEL[incident.status] ?? incident.status,
+    startedDisplay: formatUtcDisplay(incident.created_at),
+    investigationDuration: formatDuration(incident.created_at, incident.updated_at),
+    affectedServices,
+    confidence: rc?.confidence ?? 0,
+    blastRadius: rc?.blast_radius ?? incident.affected_services.length,
+    affectedUsers: rc?.affected_users ?? 0,
+    errorRate: incident.error_rate_pct ?? 0,
+    businessImpactPerHour: rc?.hourly_impact_usd ?? 0,
+  }
+}
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -277,6 +376,61 @@ const useStyles = makeStyles({
     fontSize: '13px',
     color: tokens.colorNeutralForeground3,
   },
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  skeletonLine: {
+    height: '14px',
+    borderRadius: '4px',
+    backgroundColor: tokens.colorNeutralBackground4,
+    animationName: 'ops-status-pulse',
+    animationDuration: '1.8s',
+    animationTimingFunction: 'ease-in-out',
+    animationIterationCount: 'infinite',
+  },
+  skeletonBlock: {
+    height: '60px',
+    borderRadius: '6px',
+    backgroundColor: tokens.colorNeutralBackground4,
+    animationName: 'ops-status-pulse',
+    animationDuration: '1.8s',
+    animationTimingFunction: 'ease-in-out',
+    animationIterationCount: 'infinite',
+  },
+
+  // ── Error card ──────────────────────────────────────────────────────────────
+  errorCard: {
+    position: 'relative',
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRadius: '8px',
+    overflow: 'hidden',
+    boxShadow: `0 0 0 1px rgba(220, 38, 38, 0.35), 0 4px 24px rgba(0, 0, 0, 0.3)`,
+  },
+  errorAccent: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    bottom: '0',
+    width: '4px',
+    backgroundColor: '#dc2626',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+  errorContent: {
+    padding: '20px 20px 20px 24px',
+  },
+  errorTitle: {
+    margin: '0 0 6px 0',
+    padding: '0',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#f87171',
+  },
+  errorMessage: {
+    margin: '0',
+    padding: '0',
+    fontSize: '12px',
+    color: tokens.colorNeutralForeground3,
+  },
 })
 
 // ── Internal sub-components ───────────────────────────────────────────────────
@@ -339,7 +493,7 @@ const ServiceChip: React.FC<{ svc: AffectedService }> = ({ svc }) => {
 
 export const IncidentPanel: React.FC = () => {
   const s = useStyles()
-  const incident = MOCK_INCIDENT
+  const { data, loading, error } = useActiveIncidentWithRecommendations()
 
   // Trigger bar fill animations after first paint
   const [mounted, setMounted] = useState(false)
@@ -347,6 +501,41 @@ export const IncidentPanel: React.FC = () => {
     const id = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(id)
   }, [])
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className={s.page}>
+        <div className={s.card} style={{ padding: '20px 24px' }}>
+          <div className={s.criticalAccent} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className={s.skeletonLine} style={{ width: '40%' }} />
+            <div className={s.skeletonLine} style={{ width: '70%', height: '20px' }} />
+            <div className={s.skeletonLine} style={{ width: '90%' }} />
+            <div className={s.skeletonBlock} />
+            <div className={s.skeletonLine} style={{ width: '60%' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <div className={s.page}>
+        <div className={s.errorCard}>
+          <div className={s.errorAccent} />
+          <div className={s.errorContent}>
+            <p className={s.errorTitle}>Failed to load incident</p>
+            <p className={s.errorMessage}>{error ?? 'No data available'}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const incident = mapToDisplay(data)
 
   return (
     <div className={s.page}>
