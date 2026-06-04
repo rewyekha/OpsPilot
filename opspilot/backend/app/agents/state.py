@@ -106,3 +106,12 @@ class OpsPilotState(BaseModel):
     iteration_count: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: datetime | None = None
+
+    # ── LangGraph orchestration channels (Phase 4) ───────────────────────────
+    # Per-agent confidence accumulated as nodes run; drives the confidence
+    # decision. combined_confidence/escalated capture the escalation decision;
+    # root_cause_source records which agent produced the final root cause.
+    finding_confidences: dict[str, float] = Field(default_factory=dict)
+    combined_confidence: float = 0.0
+    escalated: bool = False
+    root_cause_source: str = "root_cause"
