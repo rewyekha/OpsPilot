@@ -22,6 +22,7 @@ from app.agents.logs.agent import LogsAgent
 from app.agents.metrics.agent import MetricsAgent
 from app.agents.state import OpsPilotState, Severity
 from app.config import get_settings
+from app.providers.factory import provider_is_live, resolve_execution_mode
 from app.services.event_stream import get_event_stream
 from app.services.foundry import get_foundry_client
 
@@ -121,22 +122,23 @@ def _mask_endpoint(endpoint: str) -> str:
 )
 async def system_health() -> FoundryHealthResponse:
     settings = get_settings()
-    foundry = get_foundry_client()
+    execution_mode = resolve_execution_mode().value
+    is_live = provider_is_live()
 
     log.info(
         "system.health.checked",
-        foundry_configured=foundry.is_configured,
-        execution_mode="live" if foundry.is_configured else "mock",
+        foundry_configured=is_live,
+        execution_mode=execution_mode,
     )
 
     return FoundryHealthResponse(
-        foundryConfigured=foundry.is_configured,
+        foundryConfigured=is_live,
         specialistModel=settings.specialist_model_deployment,
         commanderModel=settings.commander_model_deployment,
         reasoningModel=settings.reasoning_model_deployment,
         agentsAvailable=_AGENT_REGISTRY,
-        executionMode="live" if foundry.is_configured else "mock",
-        azureOpenAiEndpoint=_mask_endpoint(settings.azure_openai_endpoint),
+        executionMode=execution_mode,
+        azureOpenAiEndpoint=_mask_endpoint(settings.foundry_endpoint or settings.azure_openai_endpoint),
     )
 
 

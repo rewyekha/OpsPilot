@@ -34,12 +34,20 @@ class FoundryClient:
         self._api_version: str = settings.azure_openai_api_version
         self._commander_model: str = settings.commander_model_deployment
         self._specialist_model: str = settings.specialist_model_deployment
+        self._reasoning_model: str = settings.reasoning_model_deployment
         self._client: AsyncAzureOpenAI | None = None
 
     @property
     def is_configured(self) -> bool:
-        """True when Azure OpenAI endpoint is present in settings."""
-        return bool(self._endpoint)
+        """True when the resolved EXECUTION_MODE is live (Foundry).
+
+        Execution is now driven by EXECUTION_MODE through the provider factory —
+        NOT by the mere presence of an endpoint string. This keeps the agent
+        live/mock decision aligned with the centralized provider selection.
+        """
+        from app.providers.factory import provider_is_live
+
+        return provider_is_live()
 
     def _get_client(self) -> AsyncAzureOpenAI:
         if self._client is None:
@@ -86,8 +94,16 @@ class FoundryClient:
         return self._client
 
     def model_for(self, role: str) -> str:
-        """Return the deployment name for a given agent role string."""
-        return self._commander_model if role == "commander" else self._specialist_model
+        """Return the deployment name for a given agent role string.
+
+        Supports the reasoning ("o3") role so role routing is possible end-to-end,
+        even though no agent uses model_key="reasoning" yet.
+        """
+        if role == "commander":
+            return self._commander_model
+        if role == "reasoning":
+            return self._reasoning_model
+        return self._specialist_model
 
     async def structured_chat(
         self,

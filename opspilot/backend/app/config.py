@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     api_cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     log_level: str = "INFO"
 
+    # ── Execution mode (provider selection) ──────────────────────────────────
+    # mock | foundry | auto. Default "mock" so the app runs with zero credentials.
+    execution_mode: str = "mock"
+
+    # ── Azure AI Foundry provider ─────────────────────────────────────────────
+    foundry_endpoint: str = ""
+    foundry_api_key: str = ""              # empty = use managed identity
+    foundry_api_version: str = "2024-08-01-preview"
+
     # ── Azure OpenAI ─────────────────────────────────────────────────────────
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""          # empty = use managed identity
