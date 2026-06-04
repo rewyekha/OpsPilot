@@ -3,6 +3,7 @@ import json
 from pydantic import BaseModel, Field
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.agents.commander.prompts import COMMANDER_INTAKE_SYSTEM_PROMPT
 
 
@@ -25,7 +26,7 @@ class CommanderAgent(BaseAgent):
 
     role = "commander"
     role_label = "Commander"
-    model_key = "commander"
+    model_role = ModelRole.COMMANDER
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         result: IntakeOutput = await self._llm_structured(

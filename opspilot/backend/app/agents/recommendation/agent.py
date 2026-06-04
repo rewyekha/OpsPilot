@@ -3,6 +3,7 @@ import json
 from pydantic import BaseModel, Field
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.agents.commander.prompts import RECOMMENDATION_SYSTEM_PROMPT
 
 
@@ -28,7 +29,7 @@ class RecommendationOutput(BaseModel):
 class RecommendationAgent(BaseAgent):
     role = "recommendation"
     role_label = "Recommendation"
-    model_key = "commander"
+    model_role = ModelRole.COMMANDER
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         context = {

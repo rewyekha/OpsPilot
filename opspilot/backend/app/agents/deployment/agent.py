@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.tools.deployment_tools import get_config_diff, get_recent_deployments
 
 DEPLOYMENT_SYSTEM_PROMPT = """
@@ -60,7 +61,7 @@ class DeploymentAnalysis(BaseModel):
 class DeploymentAgent(BaseAgent):
     role = "deployment"
     role_label = "Deployment"
-    model_key = "specialist"
+    model_role = ModelRole.SPECIALIST
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         services = state.affected_services or ["checkout-service"]

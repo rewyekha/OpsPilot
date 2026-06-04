@@ -24,8 +24,8 @@ from app.agents.commander.agent import CommanderAgent
 from app.agents.time_machine.agent import CorrelationAgent
 from app.agents.root_cause.agent import RootCauseAgent
 from app.agents.recommendation.agent import RecommendationAgent
+from app.providers.factory import get_provider
 from app.services.event_stream import get_event_stream
-from app.services.foundry import get_foundry_client
 
 
 def _now() -> str:
@@ -34,15 +34,15 @@ def _now() -> str:
 
 class InvestigationOrchestrator:
     def __init__(self) -> None:
-        foundry = get_foundry_client()
+        provider = get_provider()
         stream = get_event_stream()
-        self.commander = CommanderAgent(foundry, stream)
-        self.metrics = MetricsAgent(foundry, stream)
-        self.logs = LogsAgent(foundry, stream)
-        self.deployment = DeploymentAgent(foundry, stream)
-        self.correlation = CorrelationAgent(foundry, stream)
-        self.root_cause = RootCauseAgent(foundry, stream)
-        self.recommendation = RecommendationAgent(foundry, stream)
+        self.commander = CommanderAgent(provider, stream)
+        self.metrics = MetricsAgent(provider, stream)
+        self.logs = LogsAgent(provider, stream)
+        self.deployment = DeploymentAgent(provider, stream)
+        self.correlation = CorrelationAgent(provider, stream)
+        self.root_cause = RootCauseAgent(provider, stream)
+        self.recommendation = RecommendationAgent(provider, stream)
         self._stream = stream
 
     async def run(

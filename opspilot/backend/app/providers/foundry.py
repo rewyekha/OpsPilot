@@ -17,7 +17,7 @@ import logging
 from typing import Any
 
 from app.config import Settings, get_settings
-from app.providers.base import AIProvider
+from app.providers.base import AIProvider, TModel
 from app.providers.models import ExecutionMode, ModelRole, ProviderConfigurationError
 
 log = logging.getLogger(__name__)
@@ -87,3 +87,23 @@ class FoundryProvider(AIProvider):
 
         completion = await client.chat.completions.create(**kwargs)
         return completion.choices[0].message.content or ""
+
+    async def structured_generate(
+        self,
+        role: ModelRole,
+        prompt: str,
+        schema: type[TModel],
+    ) -> TModel:
+        """Schema-driven generation via Azure OpenAI structured output (parse)."""
+        client = self._get_client()
+        deployment = self.model_for(role)
+
+        completion = await client.beta.chat.completions.parse(
+            model=deployment,
+            messages=[{"role": "user", "content": prompt}],
+            response_format=schema,
+        )
+        parsed = completion.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError(f"Foundry returned no parsed result for {schema.__name__}")
+        return parsed

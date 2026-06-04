@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.tools.logs_tools import query_connection_pool_stats, query_error_logs
 
 LOGS_SYSTEM_PROMPT = """
@@ -49,7 +50,7 @@ class LogsAnalysis(BaseModel):
 class LogsAgent(BaseAgent):
     role = "logs"
     role_label = "Logs"
-    model_key = "specialist"
+    model_role = ModelRole.SPECIALIST
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         services = state.affected_services or ["checkout-service"]

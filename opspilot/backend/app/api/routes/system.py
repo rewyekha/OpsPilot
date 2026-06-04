@@ -22,9 +22,8 @@ from app.agents.logs.agent import LogsAgent
 from app.agents.metrics.agent import MetricsAgent
 from app.agents.state import OpsPilotState, Severity
 from app.config import get_settings
-from app.providers.factory import provider_is_live, resolve_execution_mode
+from app.providers.factory import get_provider, provider_is_live, resolve_execution_mode
 from app.services.event_stream import get_event_stream
-from app.services.foundry import get_foundry_client
 
 log = structlog.get_logger(__name__)
 
@@ -159,14 +158,14 @@ async def system_health() -> FoundryHealthResponse:
     },
 )
 async def test_agents(body: AgentTestRequest) -> AgentTestResponse:
-    foundry = get_foundry_client()
+    provider = get_provider()
     stream = get_event_stream()
     incident_id = f"TEST-{int(time.monotonic() * 1000)}"
 
     log.info(
         "agents.test.started",
         incident_id=incident_id,
-        mode="live" if foundry.is_configured else "mock",
+        mode="live" if provider.is_live else "mock",
         incident_preview=body.incident[:80],
     )
 
@@ -185,9 +184,9 @@ async def test_agents(body: AgentTestRequest) -> AgentTestResponse:
     stream.open(incident_id)
 
     agents = [
-        MetricsAgent(foundry, stream),
-        LogsAgent(foundry, stream),
-        DeploymentAgent(foundry, stream),
+        MetricsAgent(provider, stream),
+        LogsAgent(provider, stream),
+        DeploymentAgent(provider, stream),
     ]
 
     t0 = time.monotonic()
@@ -198,7 +197,7 @@ async def test_agents(body: AgentTestRequest) -> AgentTestResponse:
     await stream.close(incident_id)
 
     results: list[AgentRunResult] = []
-    mode = "live" if foundry.is_configured else "mock"
+    mode = "live" if provider.is_live else "mock"
 
     for agent, finding in zip(agents, findings):
         if isinstance(finding, BaseException):
@@ -244,7 +243,7 @@ async def test_agents(body: AgentTestRequest) -> AgentTestResponse:
     return AgentTestResponse(
         incident=body.incident,
         timestamp=datetime.now(timezone.utc).isoformat(),
-        foundryConfigured=foundry.is_configured,
+        foundryConfigured=provider.is_live,
         results=results,
         totalDurationMs=total_ms,
     )

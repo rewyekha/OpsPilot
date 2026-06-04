@@ -9,8 +9,13 @@ caller change.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TypeVar
+
+from pydantic import BaseModel
 
 from app.providers.models import ExecutionMode, ModelRole
+
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 class AIProvider(ABC):
@@ -34,4 +39,18 @@ class AIProvider(ABC):
     @abstractmethod
     async def generate(self, role: ModelRole, prompt: str) -> str:
         """Generate a plain-text completion for *prompt* using *role*'s model."""
+        ...
+
+    @abstractmethod
+    async def structured_generate(
+        self,
+        role: ModelRole,
+        prompt: str,
+        schema: type[TModel],
+    ) -> TModel:
+        """Generate a response validated against *schema* (a Pydantic model).
+
+        Returns an instance of *schema*. Mock providers return a deterministic
+        instance; live providers use the model's structured-output support.
+        """
         ...

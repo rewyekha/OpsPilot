@@ -7,16 +7,20 @@ Recommendation) inherits from BaseAgent and implements _investigate().
 Execution contract
 ------------------
 1. BaseAgent.run() emits  agent.started  SSE event
-2. Calls _investigate() — either via real LLM (FoundryClient) or mock fallback
+2. Calls _investigate() (live) or _mock_investigate(), chosen by the injected
+   AIProvider (provider.is_live) — see app.providers
 3. Emits  agent.finding  SSE event with confidence + summary
 4. Emits  agent.completed  SSE event
 5. Returns AgentFinding to the Orchestrator for fan-in
 
-Graceful degradation
---------------------
-When AZURE_OPENAI_ENDPOINT is not configured, each agent calls its
-_mock_investigate() method, returning deterministic demo data identical to
-the existing mock services. The SSE event sequence is identical in both paths.
+Provider architecture
+---------------------
+Agents depend only on the AIProvider interface; the concrete provider (Mock or
+Foundry) is chosen centrally by app.providers.get_provider() based on
+EXECUTION_MODE. When the provider is not live (EXECUTION_MODE=mock), each agent
+calls _mock_investigate() and returns deterministic demo data — identical SSE
+sequence and output in both paths. Live structured calls flow through
+provider.structured_generate(role, prompt, schema).
 """
 from __future__ import annotations
 
@@ -30,8 +34,9 @@ from typing import Any
 import structlog
 
 from app.agents.state import OpsPilotState
+from app.providers.base import AIProvider
+from app.providers.models import ModelRole
 from app.services.event_stream import EventStreamService
-from app.services.foundry import FoundryClient
 
 log = structlog.get_logger(__name__)
 _stdlib_log = logging.getLogger(__name__)
@@ -63,10 +68,10 @@ class BaseAgent(ABC):
     # Subclasses must override
     role: str = ""
     role_label: str = ""
-    model_key: str = "specialist"   # "specialist" | "commander"
+    model_role: ModelRole = ModelRole.SPECIALIST  # COMMANDER | SPECIALIST | REASONING
 
-    def __init__(self, foundry: FoundryClient, stream: EventStreamService) -> None:
-        self._foundry = foundry
+    def __init__(self, provider: AIProvider, stream: EventStreamService) -> None:
+        self._provider = provider
         self._stream = stream
 
     # ── Public entry point ────────────────────────────────────────────────────
@@ -80,7 +85,7 @@ class BaseAgent(ABC):
         incident_id = state.incident_id
         started_at = datetime.now(timezone.utc).isoformat()
         t0 = time.monotonic()
-        mode = "live" if self._foundry.is_configured else "mock"
+        mode = "live" if self._provider.is_live else "mock"
 
         log.info(
             "agent.started",
@@ -98,7 +103,7 @@ class BaseAgent(ABC):
         })
 
         try:
-            if self._foundry.is_configured:
+            if self._provider.is_live:
                 finding = await self._investigate(state)
             else:
                 finding = await self._mock_investigate(state)
@@ -175,24 +180,23 @@ class BaseAgent(ABC):
         except Exception:
             pass
 
-    def _model(self) -> str:
-        return self._foundry.model_for(self.model_key)
-
     async def _llm_structured(
         self,
         system: str,
         user: str,
         response_model: type,
     ) -> Any:
-        """Convenience wrapper: structured LLM call returning a Pydantic model."""
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]
-        return await self._foundry.structured_chat(
-            messages=messages,
-            model_deployment=self._model(),
-            response_model=response_model,
+        """Structured LLM call routed through the active AIProvider.
+
+        The agent's `model_role` selects the deployment; the system + user
+        messages are combined into one prompt to match the provider's
+        structured_generate(role, prompt, schema) contract.
+        """
+        prompt = f"{system}\n\n{user}"
+        return await self._provider.structured_generate(
+            role=self.model_role,
+            prompt=prompt,
+            schema=response_model,
         )
 
     @staticmethod

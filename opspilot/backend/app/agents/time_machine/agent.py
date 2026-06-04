@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.agents.commander.prompts import CORRELATION_SYSTEM_PROMPT
 
 
@@ -46,7 +47,8 @@ class CorrelationAgent(BaseAgent):
 
     role = "time_machine"
     role_label = "Correlation"
-    model_key = "commander"
+    # Phase 2 routing table assigns the Time Machine agent to the SPECIALIST tier.
+    model_role = ModelRole.SPECIALIST
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         findings_data = {

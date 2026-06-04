@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.agents.metrics.prompts import METRICS_SYSTEM_PROMPT
 from app.tools.metrics_tools import (
     query_db_connections,
@@ -40,7 +41,7 @@ class MetricsAnalysis(BaseModel):
 class MetricsAgent(BaseAgent):
     role = "metrics"
     role_label = "Metrics"
-    model_key = "specialist"
+    model_role = ModelRole.SPECIALIST
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         services = state.affected_services or ["checkout-service"]

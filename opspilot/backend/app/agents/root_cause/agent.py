@@ -3,6 +3,7 @@ import json
 from pydantic import BaseModel, Field
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
+from app.providers.models import ModelRole
 from app.agents.commander.prompts import ROOT_CAUSE_SYSTEM_PROMPT
 
 
@@ -19,7 +20,7 @@ class RootCauseOutput(BaseModel):
 class RootCauseAgent(BaseAgent):
     role = "root_cause"
     role_label = "Root Cause"
-    model_key = "commander"
+    model_role = ModelRole.COMMANDER
 
     async def _investigate(self, state: OpsPilotState) -> AgentFinding:
         context = {
