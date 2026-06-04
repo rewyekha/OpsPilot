@@ -89,6 +89,9 @@ class OpsPilotState(BaseModel):
     logs_findings: dict[str, Any] | None = None
     deployment_findings: dict[str, Any] | None = None
     infra_findings: dict[str, Any] | None = None
+    # Root cause finding (set by RootCauseAgent, refined by the reasoning agent
+    # on escalation). Consumed by RecommendationAgent.
+    root_cause_findings: dict[str, Any] | None = None
 
     # ── Synthesized outputs (set by Commander during synthesis) ─────────────
     timeline: list[Any] = Field(default_factory=list)  # list[TimelineEvent] or raw dicts

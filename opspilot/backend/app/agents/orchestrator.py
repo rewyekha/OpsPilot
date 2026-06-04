@@ -23,9 +23,27 @@ from app.agents.deployment.agent import DeploymentAgent
 from app.agents.commander.agent import CommanderAgent
 from app.agents.time_machine.agent import CorrelationAgent
 from app.agents.root_cause.agent import RootCauseAgent
+from app.agents.reasoning.agent import DeepReasoningAgent
 from app.agents.recommendation.agent import RecommendationAgent
+from app.config import get_settings
 from app.providers.factory import get_provider
 from app.services.event_stream import get_event_stream
+
+
+def _combined_confidence(values: list[float]) -> float:
+    """Combined investigation confidence (mean of available finding confidences)."""
+    vals = [v for v in values if v is not None]
+    return round(sum(vals) / len(vals), 1) if vals else 0.0
+
+
+def _root_cause_state(finding) -> dict:
+    """Flatten an AgentFinding into the dict the RecommendationAgent consumes."""
+    return {
+        **finding.metadata,
+        "summary": finding.summary,
+        "confidence": finding.confidence,
+        "evidence": finding.evidence,
+    }
 
 
 def _now() -> str:
@@ -42,6 +60,7 @@ class InvestigationOrchestrator:
         self.deployment = DeploymentAgent(provider, stream)
         self.correlation = CorrelationAgent(provider, stream)
         self.root_cause = RootCauseAgent(provider, stream)
+        self.reasoning = DeepReasoningAgent(provider, stream)
         self.recommendation = RecommendationAgent(provider, stream)
         self._stream = stream
 
@@ -104,22 +123,55 @@ class InvestigationOrchestrator:
 
         # ── Phase 3: Root cause ──────────────────────────────────────────────
         root_cause_finding = await self.root_cause.run(state)
+        state = state.model_copy(update={"root_cause_findings": _root_cause_state(root_cause_finding)})
+
+        # ── Phase 3b: Reasoning escalation (o3) when confidence is low ────────
+        combined = _combined_confidence([
+            metrics_finding.confidence,
+            logs_finding.confidence,
+            deployment_finding.confidence,
+            correlation_finding.confidence,
+            root_cause_finding.confidence,
+        ])
+        threshold = get_settings().reasoning_escalation_threshold
+        escalated = combined < threshold
+        final_root_cause = root_cause_finding
+
+        if escalated:
+            await self._emit(incident_id, {
+                "event_type": "reasoning.escalated",
+                "agent_name": "reasoning",
+                "incident_id": incident_id,
+                "timestamp": _now(),
+                "payload": {
+                    "combined_confidence": combined,
+                    "threshold": threshold,
+                    "reason": "combined investigation confidence below escalation threshold",
+                },
+            })
+            # Route full context to the REASONING (o3) role for a refined root cause.
+            final_root_cause = await self.reasoning.run(state)
+            state = state.model_copy(
+                update={"root_cause_findings": _root_cause_state(final_root_cause)}
+            )
 
         await self._emit(incident_id, {
             "event_type": "root_cause.updated",
-            "agent_name": "root_cause",
+            "agent_name": final_root_cause.role,
             "incident_id": incident_id,
             "timestamp": _now(),
             "payload": {
-                "confidence": root_cause_finding.confidence,
-                "title": root_cause_finding.metadata.get("title", "Root cause identified"),
-                "blast_radius": root_cause_finding.metadata.get("blast_radius", 0),
-                "affected_users": root_cause_finding.metadata.get("affected_users", 0),
-                "hourly_impact_usd": root_cause_finding.metadata.get("hourly_impact_usd", 0.0),
+                "confidence": final_root_cause.confidence,
+                "title": final_root_cause.metadata.get("title", "Root cause identified"),
+                "blast_radius": final_root_cause.metadata.get("blast_radius", 0),
+                "affected_users": final_root_cause.metadata.get("affected_users", 0),
+                "hourly_impact_usd": final_root_cause.metadata.get("hourly_impact_usd", 0.0),
+                "combined_confidence": combined,
+                "escalated": escalated,
             },
         })
 
-        # ── Phase 4: Recommendations ─────────────────────────────────────────
+        # ── Phase 4: Recommendations (consume refined root cause via state) ───
         await self.recommendation.run(state)
 
         # ── Done ─────────────────────────────────────────────────────────────
@@ -130,7 +182,9 @@ class InvestigationOrchestrator:
             "timestamp": _now(),
             "payload": {
                 "incident_id": incident_id,
-                "root_cause_confidence": root_cause_finding.confidence,
+                "root_cause_confidence": final_root_cause.confidence,
+                "combined_confidence": combined,
+                "escalated": escalated,
             },
         })
 

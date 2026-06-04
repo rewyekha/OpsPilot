@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     specialist_model_deployment: str = "gpt-4o-mini"
     reasoning_model_deployment: str = "o3"
 
+    # ── Reasoning escalation ─────────────────────────────────────────────────
+    # When the combined investigation confidence (0–100) is below this
+    # threshold, the orchestrator escalates to the REASONING (o3) agent for a
+    # refined root cause. Default 70 keeps the high-confidence demo path
+    # un-escalated (existing behavior unchanged).
+    reasoning_escalation_threshold: float = 70.0
+
     # ── Azure AI Foundry ─────────────────────────────────────────────────────
     azure_ai_foundry_project_name: str = ""
     azure_ai_foundry_resource_group: str = ""

@@ -36,6 +36,9 @@ class RecommendationAgent(BaseAgent):
             "metrics": state.metrics_findings,
             "logs": state.logs_findings,
             "deployment": state.deployment_findings,
+            # Refined (or original) root cause — set by the orchestrator after the
+            # root-cause / reasoning-escalation phase. Drives remediation choice.
+            "root_cause": state.root_cause_findings,
             "incident_id": state.incident_id,
             "incident_description": state.incident_description,
         }
