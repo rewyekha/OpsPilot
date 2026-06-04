@@ -8,6 +8,7 @@ import { IncidentPanel } from '../incident/IncidentPanel'
 import { AgentActivityPanel } from '../agents/AgentActivityPanel'
 import { HistoryPanel } from '../history/HistoryPanel'
 import { RecommendationPanel } from '../recommendations/RecommendationPanel'
+import { ErrorBoundary } from '../shared/ErrorBoundary'
 import { useNotify } from '../../store/NotificationContext'
 
 export const PAGE_LABELS: Record<string, string> = {
@@ -105,21 +106,25 @@ export const AppShell: React.FC = () => {
           onNavigate={setActivePage}
         />
         <main className={styles.main}>
-          {/* key forces a remount on refresh so data hooks re-fetch */}
+          {/* key forces a remount on refresh so data hooks re-fetch.
+              ErrorBoundary keeps a page crash from blanking the shell; it
+              resets when the active page changes (resetKey). */}
           <div className={styles.pageContent} key={refreshNonce}>
-            {activePage === 'incidents'
-              ? <IncidentPanel />
-              : activePage === 'agents'
-                ? <AgentActivityPanel />
-                : activePage === 'history'
-                  ? <HistoryPanel />
-                  : activePage === 'home'
-                    ? <RecommendationPanel />
-                    : <PagePlaceholder
-                        label={PAGE_LABELS[activePage] ?? activePage}
-                        onNavigate={setActivePage}
-                      />
-            }
+            <ErrorBoundary resetKey={activePage}>
+              {activePage === 'incidents'
+                ? <IncidentPanel />
+                : activePage === 'agents'
+                  ? <AgentActivityPanel />
+                  : activePage === 'history'
+                    ? <HistoryPanel />
+                    : activePage === 'home'
+                      ? <RecommendationPanel />
+                      : <PagePlaceholder
+                          label={PAGE_LABELS[activePage] ?? activePage}
+                          onNavigate={setActivePage}
+                        />
+              }
+            </ErrorBoundary>
           </div>
         </main>
       </div>

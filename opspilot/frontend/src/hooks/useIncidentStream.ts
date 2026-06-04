@@ -19,7 +19,7 @@ export interface StreamEvent {
   payload: Record<string, unknown>
 }
 
-const STREAM_BASE = 'http://localhost:8000'
+const STREAM_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export function useIncidentStream(incidentId: string): {
   status: ConnectionStatus

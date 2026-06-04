@@ -73,20 +73,38 @@ class FoundryProvider(AIProvider):
         self._client = AsyncAzureOpenAI(**kwargs)
         return self._client
 
-    async def generate(self, role: ModelRole, prompt: str) -> str:
-        client = self._get_client()
-        deployment = self.model_for(role)
+    @staticmethod
+    def _is_reasoning(role: ModelRole) -> bool:
+        return role is ModelRole.REASONING
 
-        kwargs: dict[str, Any] = {
-            "model": deployment,
+    def _base_params(self, role: ModelRole, prompt: str) -> dict[str, Any]:
+        """Role-aware request params.
+
+        Reasoning models (o3) reject `temperature` and use `max_completion_tokens`
+        rather than `max_tokens`; we therefore pass NEITHER an explicit temperature
+        nor `max_tokens` for the reasoning role, letting the service defaults apply.
+        Chat models (gpt-4o / gpt-4o-mini) get a low temperature for determinism.
+        """
+        params: dict[str, Any] = {
+            "model": self.model_for(role),
             "messages": [{"role": "user", "content": prompt}],
         }
-        # o3 / reasoning deployments reject `temperature`; only set it for chat models.
-        if role is not ModelRole.REASONING:
-            kwargs["temperature"] = 0.2
+        if not self._is_reasoning(role):
+            params["temperature"] = 0.2
+        return params
 
-        completion = await client.chat.completions.create(**kwargs)
-        return completion.choices[0].message.content or ""
+    async def generate(self, role: ModelRole, prompt: str) -> str:
+        client = self._get_client()
+        try:
+            completion = await client.chat.completions.create(**self._base_params(role, prompt))
+            return completion.choices[0].message.content or ""
+        except Exception as exc:
+            # Log role + deployment + error only — never endpoint/key material.
+            log.warning(
+                "foundry.generate.error role=%s deployment=%s error=%s",
+                role.value, self.model_for(role), type(exc).__name__,
+            )
+            raise
 
     async def structured_generate(
         self,
@@ -94,16 +112,27 @@ class FoundryProvider(AIProvider):
         prompt: str,
         schema: type[TModel],
     ) -> TModel:
-        """Schema-driven generation via Azure OpenAI structured output (parse)."""
+        """Schema-driven generation via Azure OpenAI structured output (parse).
+
+        Uses beta.chat.completions.parse with the Pydantic schema as
+        response_format. No `temperature` is sent (parse does not accept it and
+        o3 would reject it), keeping the call valid across gpt-4o / gpt-4o-mini / o3.
+        """
         client = self._get_client()
         deployment = self.model_for(role)
-
-        completion = await client.beta.chat.completions.parse(
-            model=deployment,
-            messages=[{"role": "user", "content": prompt}],
-            response_format=schema,
-        )
-        parsed = completion.choices[0].message.parsed
-        if parsed is None:
-            raise ValueError(f"Foundry returned no parsed result for {schema.__name__}")
-        return parsed
+        try:
+            completion = await client.beta.chat.completions.parse(
+                model=deployment,
+                messages=[{"role": "user", "content": prompt}],
+                response_format=schema,
+            )
+            parsed = completion.choices[0].message.parsed
+            if parsed is None:
+                raise ValueError(f"Foundry returned no parsed result for {schema.__name__}")
+            return parsed
+        except Exception as exc:
+            log.warning(
+                "foundry.structured_generate.error role=%s deployment=%s schema=%s error=%s",
+                role.value, deployment, schema.__name__, type(exc).__name__,
+            )
+            raise

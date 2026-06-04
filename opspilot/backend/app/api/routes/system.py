@@ -14,8 +14,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+
+from app.api.security import require_api_key
 
 from app.agents.deployment.agent import DeploymentAgent
 from app.agents.logs.agent import LogsAgent
@@ -154,8 +156,10 @@ async def system_health() -> FoundryHealthResponse:
         "All three agents are always executed regardless of Foundry configuration."
     ),
     responses={
+        401: {"description": "Invalid or missing X-API-KEY (when DEV_API_KEY is set)"},
         422: {"description": "Incident description too short (min 10 characters)"},
     },
+    dependencies=[Depends(require_api_key)],
 )
 async def test_agents(body: AgentTestRequest) -> AgentTestResponse:
     provider = get_provider()

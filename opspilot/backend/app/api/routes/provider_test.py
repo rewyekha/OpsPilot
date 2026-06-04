@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.api.security import require_api_key
 from app.providers.factory import get_provider, reset_provider_cache
 from app.providers.models import ModelRole, ProviderConfigurationError
 
@@ -49,7 +50,11 @@ class FoundryTestResponse(BaseModel):
         "EXECUTION_MODE) using the requested model role. Use this to verify the "
         "provider layer independently of the agents."
     ),
-    responses={503: {"description": "Foundry mode selected but not configured"}},
+    responses={
+        401: {"description": "Invalid or missing X-API-KEY (when DEV_API_KEY is set)"},
+        503: {"description": "Foundry mode selected but not configured"},
+    },
+    dependencies=[Depends(require_api_key)],
 )
 async def test_foundry(body: FoundryTestRequest) -> FoundryTestResponse:
     # Re-resolve each call so the endpoint reflects the current EXECUTION_MODE

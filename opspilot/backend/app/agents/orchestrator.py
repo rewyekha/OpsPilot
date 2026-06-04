@@ -16,6 +16,7 @@ for backward compatibility.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -35,6 +36,9 @@ from app.agents.graph import (  # noqa: F401  (re-exported for tests/back-compat
 )
 from app.providers.factory import get_provider
 from app.services.event_stream import get_event_stream
+
+
+log = logging.getLogger(__name__)
 
 
 def _now() -> str:
@@ -77,60 +81,63 @@ class InvestigationOrchestrator:
     ) -> None:
         """Run the full investigation via the LangGraph, emitting SSE events."""
         self._stream.open(incident_id)
-
-        await self._emit(incident_id, {
-            "event_type": "investigation.started",
-            "agent_name": "orchestrator",
-            "incident_id": incident_id,
-            "timestamp": _now(),
-            "payload": {
+        try:
+            await self._emit(incident_id, {
+                "event_type": "investigation.started",
+                "agent_name": "orchestrator",
                 "incident_id": incident_id,
-                "description": incident_description[:200],
-            },
-        })
+                "timestamp": _now(),
+                "payload": {
+                    "incident_id": incident_id,
+                    "description": incident_description[:200],
+                },
+            })
 
-        # ── Commander intake (classify severity + infer affected services) ───
-        intake_state = OpsPilotState(
-            incident_id=incident_id,
-            incident_description=incident_description,
-            affected_services=affected_services or [],
-            timeline=[],
-            recommendations=[],
-            agent_status={},
-            messages=[],
-            created_at=datetime.now(timezone.utc),
-        )
-        commander_finding = await self.commander.run(intake_state)
-        services = affected_services or commander_finding.metadata.get("affected_services", []) or []
+            # ── Commander intake (classify severity + infer affected services) ─
+            intake_state = OpsPilotState(
+                incident_id=incident_id,
+                incident_description=incident_description,
+                affected_services=affected_services or [],
+                timeline=[],
+                recommendations=[],
+                agent_status={},
+                messages=[],
+                created_at=datetime.now(timezone.utc),
+            )
+            commander_finding = await self.commander.run(intake_state)
+            services = affected_services or commander_finding.metadata.get("affected_services", []) or []
 
-        # ── Invoke the compiled investigation graph ───────────────────────────
-        initial_state = OpsPilotState(
-            incident_id=incident_id,
-            incident_description=incident_description,
-            affected_services=services,
-            timeline=[],
-            recommendations=[],
-            agent_status={},
-            messages=[],
-            created_at=datetime.now(timezone.utc),
-        )
-        final_state = await self._graph.ainvoke(initial_state)
+            # ── Invoke the compiled investigation graph ───────────────────────
+            initial_state = OpsPilotState(
+                incident_id=incident_id,
+                incident_description=incident_description,
+                affected_services=services,
+                timeline=[],
+                recommendations=[],
+                agent_status={},
+                messages=[],
+                created_at=datetime.now(timezone.utc),
+            )
+            final_state = await self._graph.ainvoke(initial_state)
 
-        rc = _sget(final_state, "root_cause_findings", {}) or {}
-        await self._emit(incident_id, {
-            "event_type": "investigation.complete",
-            "agent_name": "orchestrator",
-            "incident_id": incident_id,
-            "timestamp": _now(),
-            "payload": {
+            rc = _sget(final_state, "root_cause_findings", {}) or {}
+            await self._emit(incident_id, {
+                "event_type": "investigation.complete",
+                "agent_name": "orchestrator",
                 "incident_id": incident_id,
-                "root_cause_confidence": rc.get("confidence", 0.0),
-                "combined_confidence": _sget(final_state, "combined_confidence", 0.0),
-                "escalated": _sget(final_state, "escalated", False),
-            },
-        })
-
-        await self._stream.close(incident_id)
+                "timestamp": _now(),
+                "payload": {
+                    "incident_id": incident_id,
+                    "root_cause_confidence": rc.get("confidence", 0.0),
+                    "combined_confidence": _sget(final_state, "combined_confidence", 0.0),
+                    "escalated": _sget(final_state, "escalated", False),
+                },
+            })
+        except Exception:
+            # Log without exposing secrets (traceback only; no endpoint/key material).
+            log.exception("orchestrator.run.failed incident_id=%s", incident_id)
+        finally:
+            await self._stream.close(incident_id)
 
     async def _emit(self, incident_id: str, event: dict) -> None:
         try:

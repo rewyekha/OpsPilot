@@ -1,4 +1,6 @@
-const BASE_URL = 'http://localhost:8000'
+// Configurable for deployment; falls back to local dev. Set VITE_API_BASE_URL
+// in frontend/.env (see frontend/.env.example) — no source edits required.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
   status: number

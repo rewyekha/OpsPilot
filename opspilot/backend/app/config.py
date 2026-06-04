@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # un-escalated (existing behavior unchanged).
     reasoning_escalation_threshold: float = 70.0
 
+    # ── Demo mode (Phase 5) ───────────────────────────────────────────────────
+    # When true, the combined confidence is intentionally lowered so the o3
+    # reasoning escalation always fires — useful for demoing the reasoning path.
+    # DISABLED by default; production behavior is unchanged.
+    low_confidence_demo: bool = False
+
+    # ── API security (Phase 5) ────────────────────────────────────────────────
+    # Optional shared key for the model-invoking test endpoints. Empty = open
+    # (local dev unchanged). When set, callers must send `X-API-KEY: <value>`.
+    dev_api_key: str = ""
+
     # ── Azure AI Foundry ─────────────────────────────────────────────────────
     azure_ai_foundry_project_name: str = ""
     azure_ai_foundry_resource_group: str = ""

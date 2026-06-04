@@ -93,6 +93,23 @@ async def test_graph_routes_through_reasoning_when_escalated(monkeypatch):
     assert rc["escalated"] is True and rc["confidence"] == 88.0
 
 
+@pytest.mark.asyncio
+async def test_demo_mode_forces_escalation_at_default_threshold(monkeypatch):
+    """LOW_CONFIDENCE_DEMO lowers combined confidence so o3 escalation fires
+    even at the default threshold; production (flag off) does not escalate."""
+    monkeypatch.delenv("REASONING_ESCALATION_THRESHOLD", raising=False)  # default 70
+    monkeypatch.setenv("LOW_CONFIDENCE_DEMO", "true")
+    get_settings.cache_clear()
+    events = await _run("GRAPH-DEMO")
+    completed = [e["agent_name"] for e in events if e["event_type"] == "agent.completed"]
+    types = [e["event_type"] for e in events]
+    assert "reasoning" in completed
+    assert "reasoning.escalated" in types
+    rc = next(e for e in events if e["event_type"] == "root_cause.updated")["payload"]
+    assert rc["escalated"] is True
+    assert rc["combined_confidence"] < get_settings().reasoning_escalation_threshold
+
+
 def test_graph_builds_in_foundry_mode(monkeypatch):
     """Foundry mode wires the live provider into the graph (no live call made)."""
     monkeypatch.setenv("EXECUTION_MODE", "foundry")
