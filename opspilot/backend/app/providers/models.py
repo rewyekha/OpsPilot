@@ -30,7 +30,7 @@ class ModelRole(str, Enum):
 
     COMMANDER = "commander"    # high-capability synthesis (e.g. gpt-4o)
     SPECIALIST = "specialist"  # cheap, fast, tool-grounded (e.g. gpt-4o-mini)
-    REASONING = "reasoning"    # deep reasoning (e.g. o3)
+    REASONING = "reasoning"    # deep reasoning (e.g. o4-mini)
 
     @classmethod
     def parse(cls, value: str) -> "ModelRole":

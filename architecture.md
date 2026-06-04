@@ -34,7 +34,7 @@ This pattern is not novel — it mirrors how elite SRE teams operate. What is no
 | Judging Criterion | Architectural Decision That Maximizes It |
 |---|---|
 | **Accuracy** | Each agent uses specialized prompts + domain-specific tools. No generalist hallucination. |
-| **Reasoning** | Commander uses o3/GPT-4o with structured multi-source synthesis, not a single-shot prompt. |
+| **Reasoning** | Commander uses o4-mini/GPT-4o with structured multi-source synthesis, not a single-shot prompt. |
 | **Reliability** | LangGraph state machine with checkpointing. Agents can retry independently. |
 | **Creativity** | Time Machine Agent is genuinely novel — no existing tool does this. |
 | **User Experience** | Fluent UI mission control that looks like it ships with Azure. |
@@ -817,7 +817,7 @@ This is the product Microsoft builds when it takes GitHub Copilot's code intelli
 | Agent parallelism | Fan-out/fan-in pattern | Realistic SRE team behavior; faster than sequential; clear in UI |
 | Commander model | GPT-4o | Full context window needed for multi-agent synthesis |
 | Specialist model | GPT-4o-mini | Cost-optimized; structured output is sufficient |
-| Deep reasoning model | o3 (fallback) | Demonstrates model selection intelligence |
+| Deep reasoning model | o4-mini (fallback) | Demonstrates model selection intelligence |
 | Container platform | Azure Container Apps | Managed, scalable, VNET-ready, solo-developer appropriate |
 | State persistence | Cosmos DB | Schema flexibility for evolving agent outputs |
 | Agent memory | Azure AI Search | Semantic retrieval elevates recommendations from generic to specific |

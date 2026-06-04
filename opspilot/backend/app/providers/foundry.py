@@ -80,7 +80,7 @@ class FoundryProvider(AIProvider):
     def _base_params(self, role: ModelRole, prompt: str) -> dict[str, Any]:
         """Role-aware request params.
 
-        Reasoning models (o3) reject `temperature` and use `max_completion_tokens`
+        Reasoning models (o4-mini) reject `temperature` and use `max_completion_tokens`
         rather than `max_tokens`; we therefore pass NEITHER an explicit temperature
         nor `max_tokens` for the reasoning role, letting the service defaults apply.
         Chat models (gpt-4o / gpt-4o-mini) get a low temperature for determinism.
@@ -116,7 +116,7 @@ class FoundryProvider(AIProvider):
 
         Uses beta.chat.completions.parse with the Pydantic schema as
         response_format. No `temperature` is sent (parse does not accept it and
-        o3 would reject it), keeping the call valid across gpt-4o / gpt-4o-mini / o3.
+        o4-mini would reject it), keeping the call valid across gpt-4o / gpt-4o-mini / o4-mini.
         """
         client = self._get_client()
         deployment = self.model_for(role)

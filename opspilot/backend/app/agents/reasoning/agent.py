@@ -6,8 +6,8 @@ falls below `reasoning_escalation_threshold`. It receives the full incident
 context (all specialist findings + the current root cause) and produces a
 *refined* root cause with an updated confidence and an explicit reasoning trace.
 
-Model role: REASONING (routes to the o3 deployment via the provider). This is
-the single place the o3 execution path is used.
+Model role: REASONING (routes to the o4-mini deployment via the provider). This is
+the single place the o4-mini execution path is used.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ justified by the evidence, not inflated.
 
 
 class RefinedRootCause(BaseModel):
-    """Structured output from the reasoning (o3) escalation call."""
+    """Structured output from the reasoning (o4-mini) escalation call."""
 
     title: str = Field(description="Refined root cause title")
     description: str = Field(description="Refined root cause explanation")

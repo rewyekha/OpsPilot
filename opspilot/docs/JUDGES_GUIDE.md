@@ -19,7 +19,7 @@ Incident response is slow and tribal: an on-call engineer manually pivots across
 `Commander` triages → `Metrics`, `Logs`, `Deployment` gather evidence → `Time Machine` correlates a causal timeline → `Root Cause` synthesizes a hypothesis → **confidence decision** → (escalate if low) → `Recommendation` produces ranked fixes.
 
 ## 5. Foundry integration
-Each agent is routed by **`ModelRole`** to a configurable deployment — **GPT-4o** (commander/synthesis), **GPT-4o-mini** (specialists), **o3** (reasoning). `FoundryProvider` handles o3's parameter rules (no `temperature`, no `max_tokens`) and structured (schema-validated) output. See `foundry-validation.md`.
+Each agent is routed by **`ModelRole`** to a configurable deployment — **GPT-4o** (commander/synthesis), **GPT-4o-mini** (specialists), **o4-mini** (reasoning). `FoundryProvider` handles o4-mini's parameter rules (no `temperature`, no `max_tokens`) and structured (schema-validated) output. See `foundry-validation.md`.
 
 ## 6. LangGraph workflow
 A `StateGraph` over `OpsPilotState`:
@@ -31,7 +31,7 @@ START → metrics → logs → deployment → time_machine → root_cause
 Conditional edges implement the escalation branch; agents are pure nodes.
 
 ## 7. Reasoning escalation (the differentiator)
-After root cause, OpsPilot computes a **combined confidence**. If it's below the threshold (default 70), it routes the full context to the **o3** `DeepReasoningAgent`, which re-examines the evidence from first principles and returns a refined root cause + reasoning trace — then feeds it into recommendations. o3 stays **off the hot path** unless needed.
+After root cause, OpsPilot computes a **combined confidence**. If it's below the threshold (default 70), it routes the full context to the **o4-mini** `DeepReasoningAgent`, which re-examines the evidence from first principles and returns a refined root cause + reasoning trace — then feeds it into recommendations. o4-mini stays **off the hot path** unless needed.
 
 ## 8. Demo steps
 ```bash
@@ -44,8 +44,8 @@ cd opspilot/frontend && npm install && npm run dev    # http://localhost:3000
 2. **Execute** a remediation → confirm → watch lifecycle move Mitigating → Monitoring; **Mark Resolved** → **Close**.
 3. **Generate Report** (command bar) → sectioned report → Download/Copy; **Export** JSON.
 4. **History** → closed incident → reopen details.
-5. **Provider smoke test:** `POST /api/test/foundry {"message":"...","role":"reasoning"}` → shows provider + model (`o3`) + response.
-6. **See the o3 reasoning agent live:** set `LOW_CONFIDENCE_DEMO=true`, create an incident → escalation fires and the timeline shows the reasoning step.
+5. **Provider smoke test:** `POST /api/test/foundry {"message":"...","role":"reasoning"}` → shows provider + model (`o4-mini`) + response.
+6. **See the o4-mini reasoning agent live:** set `LOW_CONFIDENCE_DEMO=true`, create an incident → escalation fires and the timeline shows the reasoning step.
 
 ## 9. Known limitations
 In-memory persistence (single-replica; no Cosmos/Redis/Search wired), several read endpoints are mock-backed, and the live Foundry path is wired + unit-tested but requires credentials to exercise end-to-end. Full list in `release-readiness.md`.

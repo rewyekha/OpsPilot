@@ -1,6 +1,6 @@
 """Phase 3 — reasoning escalation tests.
 
-Covers the o3 routing, the DeepReasoningAgent mock output, the combined-confidence
+Covers the o4-mini routing, the DeepReasoningAgent mock output, the combined-confidence
 helper, and the orchestrator escalation decision (below vs above threshold) with
 mock compatibility (default threshold leaves the high-confidence flow un-escalated).
 """
@@ -45,9 +45,9 @@ def _state() -> OpsPilotState:
 
 # ── Routing & schema ──────────────────────────────────────────────────────────
 
-def test_reasoning_agent_routes_to_o3():
+def test_reasoning_agent_routes_to_o4_mini():
     assert DeepReasoningAgent.model_role is ModelRole.REASONING
-    assert get_provider().model_for(ModelRole.REASONING) == "o3"
+    assert get_provider().model_for(ModelRole.REASONING) == "o4-mini"
 
 
 @pytest.mark.asyncio
@@ -106,7 +106,7 @@ async def test_escalation_when_below_threshold(monkeypatch):
     events = await _run_and_collect("INC-ESC")
     types = [e["event_type"] for e in events]
     assert "reasoning.escalated" in types
-    # The reasoning (o3) agent ran.
+    # The reasoning (o4-mini) agent ran.
     assert any(e["event_type"] == "agent.started" and e["agent_name"] == "reasoning" for e in events)
     # Final root_cause.updated reflects the refined verdict.
     rc = next(e for e in events if e["event_type"] == "root_cause.updated")

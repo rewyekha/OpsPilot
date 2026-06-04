@@ -1,6 +1,6 @@
 """Unit tests for the AI provider layer (Foundry Integration Phase 1).
 
-Covers execution-mode resolution, role→deployment routing (incl. the o3
+Covers execution-mode resolution, role→deployment routing (incl. the o4-mini
 reasoning role), the mock provider, and the foundry-without-credentials guard.
 No Azure SDK or network access is required.
 """
@@ -41,18 +41,18 @@ def test_default_mode_is_mock(monkeypatch):
     assert provider_is_live() is False
 
 
-def test_mock_provider_routes_reasoning_to_o3():
+def test_mock_provider_routes_reasoning_to_o4_mini():
     provider = MockProvider()
     assert provider.model_for(ModelRole.COMMANDER) == "gpt-4o"
     assert provider.model_for(ModelRole.SPECIALIST) == "gpt-4o-mini"
-    assert provider.model_for(ModelRole.REASONING) == "o3"
+    assert provider.model_for(ModelRole.REASONING) == "o4-mini"
 
 
 @pytest.mark.asyncio
 async def test_mock_generate_is_deterministic_and_role_aware():
     provider = MockProvider()
     out = await provider.generate(ModelRole.REASONING, "why did it fail?")
-    assert "o3" in out and "reasoning" in out
+    assert "o4-mini" in out and "reasoning" in out
     # deterministic: same input → same output
     assert out == await provider.generate(ModelRole.REASONING, "why did it fail?")
 
@@ -76,7 +76,7 @@ def test_auto_with_endpoint_selects_foundry(monkeypatch):
     provider = get_provider()
     assert provider.name == "foundry"
     assert provider.is_live is True
-    assert provider.model_for(ModelRole.REASONING) == "o3"
+    assert provider.model_for(ModelRole.REASONING) == "o4-mini"
 
 
 def test_foundry_without_credentials_raises(monkeypatch):

@@ -132,7 +132,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
         threshold = settings.reasoning_escalation_threshold
         if settings.low_confidence_demo:
             # Demo mode: intentionally drop combined confidence below the
-            # threshold so the o3 reasoning escalation always fires. Isolated to
+            # threshold so the o4-mini reasoning escalation always fires. Isolated to
             # demo mode; production behavior is unchanged.
             combined = round(min(combined, threshold * 0.6), 1)
         escalated = combined < threshold
@@ -156,7 +156,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
     def route_after_decision(state: OpsPilotState) -> str:
         return ROUTE_REASONING if state.escalated else ROUTE_RECOMMEND
 
-    # ── Deep reasoning (o3) — refines the root cause on escalation ───────────
+    # ── Deep reasoning (o4-mini) — refines the root cause on escalation ──────
     async def deep_reasoning_node(state: OpsPilotState) -> dict:
         f = await orch.reasoning.run(state)
         return {

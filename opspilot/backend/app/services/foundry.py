@@ -96,7 +96,7 @@ class FoundryClient:
     def model_for(self, role: str) -> str:
         """Return the deployment name for a given agent role string.
 
-        Supports the reasoning ("o3") role so role routing is possible end-to-end,
+        Supports the reasoning ("o4-mini") role so role routing is possible end-to-end,
         even though no agent uses model_key="reasoning" yet.
         """
         if role == "commander":

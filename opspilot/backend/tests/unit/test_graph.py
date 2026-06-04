@@ -95,7 +95,7 @@ async def test_graph_routes_through_reasoning_when_escalated(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_demo_mode_forces_escalation_at_default_threshold(monkeypatch):
-    """LOW_CONFIDENCE_DEMO lowers combined confidence so o3 escalation fires
+    """LOW_CONFIDENCE_DEMO lowers combined confidence so o4-mini escalation fires
     even at the default threshold; production (flag off) does not escalate."""
     monkeypatch.delenv("REASONING_ESCALATION_THRESHOLD", raising=False)  # default 70
     monkeypatch.setenv("LOW_CONFIDENCE_DEMO", "true")

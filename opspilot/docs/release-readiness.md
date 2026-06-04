@@ -18,8 +18,8 @@ _Generated for Phase 5 (stabilization & hardening). Verification only — nothin
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Provider abstraction (`Mock`/`Foundry`/factory), `EXECUTION_MODE`, `/api/test/foundry` | ✅ |
-| 2 | Agents migrated to `AIProvider` + `structured_generate`; `ModelRole` routing (gpt-4o / gpt-4o-mini / o3) | ✅ |
-| 3 | Reasoning escalation — `DeepReasoningAgent` (o3), combined-confidence threshold | ✅ |
+| 2 | Agents migrated to `AIProvider` + `structured_generate`; `ModelRole` routing (gpt-4o / gpt-4o-mini / o4-mini) | ✅ |
+| 3 | Reasoning escalation — `DeepReasoningAgent` (o4-mini), combined-confidence threshold | ✅ |
 | 4 | **LangGraph** workflow (`graph.py` `StateGraph`), conditional reasoning node | ✅ |
 | 5 | Demo escalation mode, API-key auth, `ErrorBoundary`, configurable URLs, exception logging, docs, tests | ✅ |
 
@@ -37,7 +37,7 @@ Runs with **zero Azure credentials** (`EXECUTION_MODE=mock` default).
 ## Known limitations
 
 - **Persistence is in-memory** — incidents (`incident_service.MOCK_INCIDENTS`) and the SSE bus (`event_stream`, in-process `asyncio.Queue`) do not survive restart and are **single-replica only**. `cosmos_db.py` / `ai_search.py` are intentionally empty (out of scope).
-- **Live Foundry path is unverified end-to-end** — wired and unit-tested in mock; a real call requires credentials (see `foundry-validation.md`). o3 structured output uses `beta.parse`; may need per-deployment adjustment.
+- **Live Foundry path is unverified end-to-end** — wired and unit-tested in mock; a real call requires credentials (see `foundry-validation.md`). o4-mini structured output uses `beta.parse`; may need per-deployment adjustment.
 - **Mock data services** back several read endpoints (agent activity, timeline, recommendations).
 - **Dead/scaffold files** remain (see `dead-code-audit.md`); none are imported on the live path.
 - **Telemetry/tools** (Azure Monitor, Log Analytics, K8s, AI Search memory) are mock/stub.

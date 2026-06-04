@@ -3,7 +3,7 @@ MockProvider — deterministic, credential-free execution.
 
 Returns canned but role-aware text so the full pipeline (and the smoke-test
 endpoint) works with zero Azure configuration. It still reports the *configured*
-deployment names via model_for(), so role routing (incl. the o3 reasoning role)
+deployment names via model_for(), so role routing (incl. the o4-mini reasoning role)
 is observable even in mock mode.
 """
 from __future__ import annotations

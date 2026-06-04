@@ -40,17 +40,17 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2024-08-01-preview"
     commander_model_deployment: str = "gpt-4o"
     specialist_model_deployment: str = "gpt-4o-mini"
-    reasoning_model_deployment: str = "o3"
+    reasoning_model_deployment: str = "o4-mini"
 
     # ── Reasoning escalation ─────────────────────────────────────────────────
     # When the combined investigation confidence (0–100) is below this
-    # threshold, the orchestrator escalates to the REASONING (o3) agent for a
+    # threshold, the orchestrator escalates to the REASONING (o4-mini) agent for a
     # refined root cause. Default 70 keeps the high-confidence demo path
     # un-escalated (existing behavior unchanged).
     reasoning_escalation_threshold: float = 70.0
 
     # ── Demo mode (Phase 5) ───────────────────────────────────────────────────
-    # When true, the combined confidence is intentionally lowered so the o3
+    # When true, the combined confidence is intentionally lowered so the o4-mini
     # reasoning escalation always fires — useful for demoing the reasoning path.
     # DISABLED by default; production behavior is unchanged.
     low_confidence_demo: bool = False
