@@ -42,9 +42,11 @@ def test_default_mode_is_mock(monkeypatch):
 
 
 def test_mock_provider_routes_reasoning_to_o4_mini():
+    # GPT-4o / GPT-4o-mini deployments were removed; every role now resolves to
+    # the only remaining deployment, o4-mini.
     provider = MockProvider()
-    assert provider.model_for(ModelRole.COMMANDER) == "gpt-4o"
-    assert provider.model_for(ModelRole.SPECIALIST) == "gpt-4o-mini"
+    assert provider.model_for(ModelRole.COMMANDER) == "o4-mini"
+    assert provider.model_for(ModelRole.SPECIALIST) == "o4-mini"
     assert provider.model_for(ModelRole.REASONING) == "o4-mini"
 
 

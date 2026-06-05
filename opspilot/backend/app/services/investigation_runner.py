@@ -60,7 +60,8 @@ async def start_investigation(
     _TASKS[incident_id] = asyncio.create_task(
         _run(orchestrator, incident_id, description, affected_services)
     )
-    log.info("investigation.launched", incident_id=incident_id, force=force)
+    # Cost instrumentation: one INVESTIGATION_STARTED per launched run.
+    log.info("INVESTIGATION_STARTED", incident_id=incident_id, force=force)
     return "started"
 
 
@@ -70,3 +71,5 @@ async def _run(orchestrator, incident_id: str, description: str, services: list[
     finally:
         _STATUS[incident_id] = "complete"
         _TASKS.pop(incident_id, None)
+        # Cost instrumentation: one INVESTIGATION_COMPLETED per finished run.
+        log.info("INVESTIGATION_COMPLETED", incident_id=incident_id)

@@ -115,7 +115,11 @@ class BaseAgent(ABC):
                     self._provider, "model_for", lambda r: getattr(r, "value", str(r))
                 )(self.model_role)
                 log.info(
-                    "FOUNDRY_CALL", incident_id=incident_id, agent=self.role, model=model
+                    "FOUNDRY_CALL",
+                    incident_id=incident_id,
+                    agent=self.role,
+                    model=model,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                 )
                 finding = await self._investigate(state)
             else:

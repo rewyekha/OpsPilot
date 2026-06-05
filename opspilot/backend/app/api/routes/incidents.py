@@ -61,12 +61,12 @@ async def get_incident(incident_id: str) -> IncidentRecord:
     "/",
     response_model=IncidentRecord,
     status_code=status.HTTP_201_CREATED,
-    summary="Create incident and trigger investigation",
+    summary="Create incident (does NOT launch an investigation)",
     description=(
-        "Creates a new incident record and immediately starts a background "
-        "investigation via the InvestigationOrchestrator. The incident is "
-        "available via GET /api/incidents/{id} and its SSE stream via "
-        "GET /api/incidents/{id}/stream as soon as this endpoint returns."
+        "Creates a new incident record only. It does NOT run any agents — an "
+        "investigation is launched solely by the explicit "
+        "POST /api/incidents/{id}/investigate action. This keeps Azure Foundry "
+        "usage strictly user-initiated."
     ),
 )
 async def create_incident(
@@ -90,9 +90,9 @@ async def create_incident(
     incident_service.MOCK_INCIDENTS.append(incident)
     incident_service._INDEX[incident_id] = incident
 
-    # Explicit user action → launch exactly one investigation (deduped by the runner).
-    await start_investigation(incident_id, body.description, body.affected_services)
-
+    # NOTE: creation does NOT launch agents. The ONLY path that runs an
+    # investigation is POST /api/incidents/{id}/investigate (see below), so no
+    # Foundry call can happen without that explicit user action.
     log.info(
         "incidents.created",
         incident_id=incident_id,

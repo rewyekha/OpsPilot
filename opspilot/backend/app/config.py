@@ -38,8 +38,11 @@ class Settings(BaseSettings):
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""          # empty = use managed identity
     azure_openai_api_version: str = "2024-08-01-preview"
-    commander_model_deployment: str = "gpt-4o"
-    specialist_model_deployment: str = "gpt-4o-mini"
+    # Only the o4-mini deployment exists in Azure Foundry (gpt-4o / gpt-4o-mini
+    # were removed). Default every role to o4-mini so a missing/partial .env can
+    # never call a non-existent deployment (which would 404 → silent mock fallback).
+    commander_model_deployment: str = "o4-mini"
+    specialist_model_deployment: str = "o4-mini"
     reasoning_model_deployment: str = "o4-mini"
 
     # ── Reasoning escalation ─────────────────────────────────────────────────
