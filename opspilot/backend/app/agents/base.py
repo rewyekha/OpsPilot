@@ -58,7 +58,11 @@ class AgentFinding:
         self.role = role
         self.summary = summary
         self.evidence = evidence
-        self.confidence = confidence  # 0.0 – 100.0
+        # Normalize to a single 0–100 scale. Live LLMs sometimes return a 0–1
+        # value (e.g. 0.95) which passes the schema's le=100 bound but corrupts
+        # aggregation; scale any (0,1] value up once, here, at the only place a
+        # finding is constructed. Mock findings already use 0–100 (untouched).
+        self.confidence = confidence * 100.0 if 0.0 < confidence <= 1.0 else confidence
         self.metadata = metadata or {}
 
 
@@ -144,6 +148,10 @@ class BaseAgent(ABC):
                 "confidence": finding.confidence,
                 "summary": finding.summary,
                 "evidence": finding.evidence,
+                # Carry the agent's structured metadata (already computed) so the
+                # frontend can render live recommendations/root-cause without a
+                # second generation or a new API.
+                "metadata": finding.metadata,
                 "duration_ms": duration_ms,
                 "mode": mode,
             },

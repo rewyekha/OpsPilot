@@ -20,7 +20,6 @@ import {
   makeStyles,
   tokens,
   Button,
-  Spinner,
   Table,
   TableHeader,
   TableHeaderCell,
@@ -43,8 +42,6 @@ import {
   CheckmarkCircleRegular,
   LockClosedRegular,
 } from '@fluentui/react-icons'
-import { useRecommendations } from '../../hooks/useRecommendations'
-import { useAgentActivity } from '../../hooks/useAgentActivity'
 import { useActiveIncidentWithRecommendations } from '../../hooks/useIncident'
 import { useIncidentStream } from '../../hooks/useIncidentStream'
 import type { ApiAgentTask } from '../../api/agents'
@@ -127,6 +124,8 @@ const useStyles = makeStyles({
     textOverflow: 'ellipsis',
   },
   mono: { fontFamily: '"Cascadia Code", "Consolas", monospace', fontSize: '15px' },
+  kpiWait: { fontSize: '18px', fontWeight: 600, color: tokens.colorNeutralForeground4 },
+  waitRow: { padding: '16px', fontSize: '13px', color: tokens.colorNeutralForeground3 },
 
   // ── Table ────────────────────────────────────────────────────────────────────
   card: {
@@ -247,70 +246,134 @@ const Kpi: React.FC<KpiProps> = ({ label, children }) => {
   )
 }
 
+/** A live agent row, built purely from SSE events (no mock baseline). */
+interface LiveAgent {
+  role: string
+  status: string
+  confidence?: number
+  finding?: string
+  evidence?: string[]
+  started_at?: string
+  completed_at?: string
+  duration_ms?: number
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  commander: 'Commander',
+  metrics: 'Metrics',
+  logs: 'Logs',
+  deployment: 'Deployment',
+  time_machine: 'Correlation',
+  root_cause: 'Root Cause',
+  reasoning: 'Deep Reasoning',
+  recommendation: 'Recommendation',
+}
+
 export const RecommendationPanel: React.FC = () => {
   const s = useStyles()
-  const recState = useRecommendations(ACTIVE_INCIDENT_ID)
-  const agentState = useAgentActivity(ACTIVE_INCIDENT_ID)
-  const incidentState = useActiveIncidentWithRecommendations()
-  const { status: streamStatus, lastEvent } = useIncidentStream(ACTIVE_INCIDENT_ID)
+  const { status: streamStatus, events } = useIncidentStream(ACTIVE_INCIDENT_ID)
+  const incidentState = useActiveIncidentWithRecommendations() // incident metadata only
   const { jobs, timelineEvents, incidentStatus, registerIncident, markResolved, closeIncident } =
     useSession()
   const fmt = useFormatters()
   const [confirm, setConfirm] = useState<'resolved' | 'closed' | null>(null)
 
-  // Live confidence — seeded from HTTP, updated by SSE root_cause.updated
-  const [liveConfidence, setLiveConfidence] = useState<number | null>(null)
-  useEffect(() => {
-    if (lastEvent?.event_type === 'root_cause.updated') {
-      const c = lastEvent.payload.confidence
-      if (typeof c === 'number') setLiveConfidence(c)
+  // ── Live investigation results — folded from the FULL SSE event log. ───────
+  //    Folding over the complete `events` array (rather than reacting to a
+  //    single `lastEvent`) means no event is lost to React batching, so
+  //    agent.finding / root_cause.updated are always applied. SSE-only; the
+  //    dashboard shows waiting states until events arrive.
+  const live = useMemo(() => {
+    const agents: Record<string, LiveAgent> = {}
+    let rootCause: {
+      confidence: number
+      title: string
+      blast_radius: number
+      affected_users: number
+      hourly_impact_usd: number
+    } | null = null
+    let actions: ApiRecommendedAction[] | null = null
+    let severity: string | null = null
+    for (const ev of events) {
+      const role = ev.agent_name
+      const p = ev.payload as Record<string, unknown>
+      if (ev.event_type === 'root_cause.updated') {
+        rootCause = {
+          confidence: p.confidence as number,
+          title: p.title as string,
+          blast_radius: p.blast_radius as number,
+          affected_users: p.affected_users as number,
+          hourly_impact_usd: p.hourly_impact_usd as number,
+        }
+      } else if (ev.event_type === 'agent.started') {
+        agents[role] = { ...(agents[role] ?? {}), role, status: 'running', started_at: ev.timestamp }
+      } else if (ev.event_type === 'agent.completed') {
+        agents[role] = {
+          ...(agents[role] ?? { role, status: 'running' }),
+          role,
+          status: 'completed',
+          completed_at: ev.timestamp,
+          duration_ms: p.duration_ms as number,
+        }
+      } else if (ev.event_type === 'agent.finding') {
+        const meta = p.metadata as { actions?: unknown[]; severity?: string } | undefined
+        if (role === 'recommendation' && Array.isArray(meta?.actions)) {
+          actions = meta.actions as unknown as ApiRecommendedAction[]
+        }
+        if (role === 'commander' && typeof meta?.severity === 'string') severity = meta.severity
+        agents[role] = {
+          ...(agents[role] ?? { role, status: 'running' }),
+          role,
+          confidence: p.confidence as number,
+          finding: p.summary as string,
+          evidence: (p.evidence as string[]) ?? [],
+        }
+      }
     }
-  }, [lastEvent])
+    return { agents, rootCause, actions, severity }
+  }, [events])
+
+  const liveRootCause = live.rootCause
 
   // Drawer selection state
   const [selectedAgent, setSelectedAgent] = useState<ApiAgentTask | null>(null)
   const [selectedRec, setSelectedRec] = useState<ApiRecommendedAction | null>(null)
 
-  const rootCause = recState.data?.root_cause
-  const actions = useMemo(
-    () => [...(recState.data?.actions ?? [])].sort((a, b) => a.priority - b.priority),
-    [recState.data],
-  )
-  const agents = agentState.data?.agents ?? []
   const incident = incidentState.data?.incident
-
-  const confidence = liveConfidence ?? rootCause?.confidence ?? 0
   const lifecycle = incidentStatus(ACTIVE_INCIDENT_ID)
   const canResolve = lifecycle !== 'resolved' && lifecycle !== 'closed'
   const canClose = lifecycle === 'resolved'
 
-  // Seed lifecycle record with display meta so History can show it once closed.
+  // Live queue rows, built purely from SSE (insertion order = agent start order).
+  const queueAgents: ApiAgentTask[] = Object.values(live.agents).map((la) => ({
+    id: la.role,
+    incident_id: ACTIVE_INCIDENT_ID,
+    role: la.role,
+    role_label: ROLE_LABEL[la.role] ?? la.role,
+    status: la.status,
+    confidence: la.confidence ?? 0,
+    finding: la.finding ?? '',
+    evidence: la.evidence ?? [],
+    tools_called: [],
+    started_at: la.started_at ?? null,
+    completed_at: la.completed_at ?? null,
+    duration_seconds: la.duration_ms != null ? la.duration_ms / 1000 : null,
+  }))
+  const recActions = live.actions ? [...live.actions].sort((a, b) => a.priority - b.priority) : []
+  // Severity comes live from the Commander's intake finding (no mock fallback).
+  const severity = live.severity
+
+  // Register the live root cause so History shows real values once closed.
   useEffect(() => {
-    if (!rootCause) return
+    if (!liveRootCause) return
     registerIncident(ACTIVE_INCIDENT_ID, {
-      title: rootCause.title,
-      rootCause: rootCause.title,
-      impactUsd: rootCause.hourly_impact_usd,
-      blastRadius: rootCause.blast_radius,
+      title: liveRootCause.title,
+      rootCause: liveRootCause.title,
+      impactUsd: liveRootCause.hourly_impact_usd,
+      blastRadius: liveRootCause.blast_radius,
       startedAt: incident?.created_at ?? null,
     })
-  }, [rootCause, incident, registerIncident])
-
-  if (recState.loading) {
-    return (
-      <div className={s.center}>
-        <Spinner label="Loading incident…" />
-      </div>
-    )
-  }
-
-  if (recState.error || !rootCause) {
-    return (
-      <div className={s.page}>
-        <div className={s.error}>{recState.error ?? 'No incident data available.'}</div>
-      </div>
-    )
-  }
+  }, [liveRootCause, incident, registerIncident])
 
   return (
     <div className={s.page}>
@@ -343,11 +406,15 @@ export const RecommendationPanel: React.FC = () => {
 
       <div className={s.summary}>
         <Kpi label="Incident">
-          <span className={mergeClasses(s.kpiValue, s.mono)}>{rootCause.incident_id}</span>
+          <span className={mergeClasses(s.kpiValue, s.mono)}>{ACTIVE_INCIDENT_ID}</span>
         </Kpi>
         <Kpi label="Severity">
           <span>
-            <SeverityBadge severity={incident?.severity ?? 'P1'} pill />
+            {severity ? (
+              <SeverityBadge severity={severity} pill />
+            ) : (
+              <span className={s.kpiWait}>—</span>
+            )}
           </span>
         </Kpi>
         <Kpi label="Status">
@@ -356,19 +423,31 @@ export const RecommendationPanel: React.FC = () => {
           </span>
         </Kpi>
         <Kpi label="Confidence">
-          <span className={s.kpiValue} style={{ color: confidenceColor(confidence) }}>
-            {Math.round(confidence)}%
-          </span>
+          {liveRootCause ? (
+            <span className={s.kpiValue} style={{ color: confidenceColor(liveRootCause.confidence) }}>
+              {Math.round(liveRootCause.confidence)}%
+            </span>
+          ) : (
+            <span className={s.kpiWait}>—</span>
+          )}
         </Kpi>
         <Kpi label="Blast Radius">
-          <span className={s.kpiValue}>
-            {rootCause.blast_radius} svc · {formatCompactNumber(rootCause.affected_users)} users
-          </span>
+          {liveRootCause ? (
+            <span className={s.kpiValue}>
+              {liveRootCause.blast_radius} svc · {formatCompactNumber(liveRootCause.affected_users)} users
+            </span>
+          ) : (
+            <span className={s.kpiWait}>—</span>
+          )}
         </Kpi>
         <Kpi label="Cost Impact">
-          <span className={s.kpiValue} style={{ color: '#f87171' }}>
-            {formatCurrency(rootCause.hourly_impact_usd)}/hr
-          </span>
+          {liveRootCause ? (
+            <span className={s.kpiValue} style={{ color: '#f87171' }}>
+              {formatCurrency(liveRootCause.hourly_impact_usd)}/hr
+            </span>
+          ) : (
+            <span className={s.kpiWait}>—</span>
+          )}
         </Kpi>
       </div>
 
@@ -386,7 +465,7 @@ export const RecommendationPanel: React.FC = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {agents.map((a) => {
+            {queueAgents.map((a) => {
               const Icon = AGENT_ICON[a.role] ?? BotRegular
               return (
                 <TableRow
@@ -424,10 +503,12 @@ export const RecommendationPanel: React.FC = () => {
                 </TableRow>
               )
             })}
-            {agents.length === 0 && (
+            {queueAgents.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} style={{ color: tokens.colorNeutralForeground3 }}>
-                  {agentState.loading ? 'Loading agents…' : 'No agents dispatched yet.'}
+                  {streamStatus === 'connected'
+                    ? 'Waiting for investigation — agents will appear as they run…'
+                    : 'Connecting to investigation stream…'}
                 </TableCell>
               </TableRow>
             )}
@@ -437,12 +518,19 @@ export const RecommendationPanel: React.FC = () => {
 
       {/* ── Recommended actions ────────────────────────────────────────────── */}
       <span className={s.sectionLabel}>Recommended Actions</span>
-      <div className={s.tiles}>
-        {actions.map((action) => {
-          const Icon = REC_ICON[action.type] ?? WrenchRegular
-          const job = jobs[action.id]
-          return (
-            <button key={action.id} className={s.tile} onClick={() => setSelectedRec(action)}>
+      {recActions.length === 0 ? (
+        <div className={s.card}>
+          <div className={s.waitRow}>
+            No recommendations yet — generated live once the investigation reaches the Recommendation agent.
+          </div>
+        </div>
+      ) : (
+        <div className={s.tiles}>
+          {recActions.map((action) => {
+            const Icon = REC_ICON[action.type] ?? WrenchRegular
+            const job = jobs[action.id]
+            return (
+              <button key={action.id} className={s.tile} onClick={() => setSelectedRec(action)}>
               <div className={s.tileHead}>
                 <span className={s.tilePriority}>{action.priority}</span>
                 <span className={s.tileIcon}>
@@ -463,9 +551,10 @@ export const RecommendationPanel: React.FC = () => {
                 <span className={s.tileEta}>{action.estimated_time}</span>
               </div>
             </button>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Live activity (session events: executions, investigations) ──────── */}
       {timelineEvents.length > 0 && (

@@ -1,0 +1,396 @@
+[
+  {
+    "event_type": "investigation.started",
+    "agent_name": "orchestrator",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:46.201211+00:00",
+    "payload": {
+      "incident_id": "LIVE-FORCED",
+      "description": "Checkout 5xx after deploy"
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "commander",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:46.201270+00:00",
+    "payload": {
+      "message": "Commander agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "commander",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:50.531875+00:00",
+    "payload": {
+      "confidence": 90.0,
+      "summary": "COMMANDER_LIVE_TEST_2026",
+      "evidence": [
+        "checkout-service"
+      ],
+      "metadata": {
+        "severity": "P1",
+        "affected_services": [
+          "checkout-service"
+        ],
+        "incident_type": "application"
+      },
+      "duration_ms": 4330.6,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "commander",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:50.531875+00:00",
+    "payload": {
+      "duration_ms": 4330.6
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "metrics",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:50.546152+00:00",
+    "payload": {
+      "message": "Metrics agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "metrics",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:54.290023+00:00",
+    "payload": {
+      "confidence": 95.0,
+      "summary": "The metrics analysis determined that the anomaly for the checkout-service began on 2026-06-03 at 12:20:00+00:00, with an unusually high DB connection count signaling the onset of the issue. The error rate peaked at 74.1%, and p99 latency reached 1923 ms. Evidence supports DB connection pool limits as the primary driver, markedly affecting service throughput and error rates.",
+      "evidence": [
+        "DB connections anomaly was detected on 2026-06-03T12:20:00+00:00 with a count of 5, deviating from the baseline of 8.",
+        "Error rate peaked at 74.1% on 2026-06-03T12:24:00+00:00, starting its deviation at 12:22:00+00:00.",
+        "p99 latency reached 1923 ms on 2026-06-03T12:24:00+00:00, also starting its deviation after the DB pool issue."
+      ],
+      "metadata": {
+        "error_rate_pct": 74.1,
+        "latency_p99_ms": 1923.0,
+        "anomaly_start": "2026-06-03T12:20:00+00:00",
+        "root_metric": "db_connections"
+      },
+      "duration_ms": 3743.9,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "metrics",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:54.290023+00:00",
+    "payload": {
+      "duration_ms": 3743.9
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "logs",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:54.291568+00:00",
+    "payload": {
+      "message": "Logs agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "logs",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:57.124627+00:00",
+    "payload": {
+      "confidence": 98.0,
+      "summary": "The incident is characterized by a total of 2847 occurrences of 'sqlalchemy.exc.TimeoutError' errors starting from 2026-06-03T12:23:00+00:00, attributed to the QueuePool connection limits being overwhelmed due to the effective pool size being reduced to 5 (expected size: 20) after deployment of version v2.4.1.",
+      "evidence": [
+        "Errors count: 2847.",
+        "First error occurrence timestamp: 2026-06-03T12:23:00+00:00.",
+        "Current pool size: 5, expected pool size: 20.",
+        "Log message: 'QueuePool limit of size 5 overflow 10 reached, connection timed out'."
+      ],
+      "metadata": {
+        "dominant_error": "sqlalchemy.exc.TimeoutError",
+        "error_count": 2847,
+        "pool_size_current": 5,
+        "pool_size_expected": 20,
+        "config_regression": true
+      },
+      "duration_ms": 2833.1,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "logs",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:57.124627+00:00",
+    "payload": {
+      "duration_ms": 2833.1
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "deployment",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:04:57.126309+00:00",
+    "payload": {
+      "message": "Deployment agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "deployment",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:00.480368+00:00",
+    "payload": {
+      "confidence": 90.0,
+      "summary": "The incident aligns with the deployment of version v2.4.1 for checkout-service. A critical configuration change reduced the SQLALCHEMY_POOL_SIZE from 20 to 5, potentially causing 5xx errors due to database connection limitations during high traffic.",
+      "evidence": [
+        "Deployment 'deploy-checkout-v241' (v2.4.1) occurred shortly before the incident onset.",
+        "Configuration 'SQLALCHEMY_POOL_SIZE' was decreased from 20 to 5, as noted in the deployment commit 'a3f9c12'.",
+        "Incident reported as 'Checkout 5xx after deploy', indicating potential database connection exhaustion."
+      ],
+      "metadata": {
+        "suspect_version": "v2.4.1",
+        "deployed_at": "2026-06-03T12:19:00+00:00",
+        "commit_sha": "a3f9c12",
+        "config_changes": [
+          {
+            "key": "SQLALCHEMY_POOL_SIZE",
+            "before": "20",
+            "after": "5"
+          }
+        ],
+        "timeline_correlation": true
+      },
+      "duration_ms": 3354.1,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "deployment",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:00.480368+00:00",
+    "payload": {
+      "duration_ms": 3354.1
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "time_machine",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:00.482084+00:00",
+    "payload": {
+      "message": "Correlation agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "time_machine",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:05.644955+00:00",
+    "payload": {
+      "confidence": 97.0,
+      "summary": "Deployment version v2.4.1 included incorrect SQLALCHEMY_POOL_SIZE configuration, leading to widespread database connection issues, causing the checkout service to fail.",
+      "evidence": [
+        "Checkout Service",
+        "Database Services"
+      ],
+      "metadata": {
+        "timeline": [
+          {
+            "timestamp": "2026-06-03T12:19:00+00:00",
+            "type": "deployment",
+            "title": "Deployment of version v2.4.1 initiated",
+            "description": "Version v2.4.1 was deployed with configuration changes affecting SQLALCHEMY_POOL_SIZE from 20 to 5.",
+            "is_key_event": true,
+            "agent_role": "Deployment Agent",
+            "confidence": 1.0
+          },
+          {
+            "timestamp": "2026-06-03T12:20:00+00:00",
+            "type": "incident",
+            "title": "Checkout service started experiencing 5xx errors",
+            "description": "The checkout service encountered errors with a detected abnormal error rate of 74.1%, correlating with DB connection configurations.",
+            "is_key_event": true,
+            "agent_role": "Metrics Agent",
+            "confidence": 1.0
+          },
+          {
+            "timestamp": "2026-06-03T12:20:15+00:00",
+            "type": "detection",
+            "title": "Error analysis indicates DB connection pool misconfiguration",
+            "description": "Logs show dominant error 'sqlalchemy.exc.TimeoutError', with DB connection pool size at 5 instead of the expected value of 20.",
+            "is_key_event": false,
+            "agent_role": "Logs Agent",
+            "confidence": 0.9
+          },
+          {
+            "timestamp": "2026-06-03T12:20:30+00:00",
+            "type": "correlation",
+            "title": "Incident correlated with recent deployment",
+            "description": "Deployment version v2.4.1 identified as the root cause with SQLALCHEMY_POOL_SIZE configuration regression.",
+            "is_key_event": false,
+            "agent_role": "Correlation Agent",
+            "confidence": 0.95
+          },
+          {
+            "timestamp": "2026-06-03T12:21:00+00:00",
+            "type": "root_cause",
+            "title": "Root cause identified: incorrect SQLALCHEMY_POOL_SIZE configuration in deployment version v2.4.1",
+            "description": "SQLALCHEMY_POOL_SIZE was set to 5 instead of the intended value of 20, causing DB connection issues.",
+            "is_key_event": true,
+            "agent_role": "Root Cause Analysis",
+            "confidence": 1.0
+          }
+        ],
+        "moment_of_failure": "2026-06-03T12:20:00+00:00"
+      },
+      "duration_ms": 5162.9,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "time_machine",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:05.644955+00:00",
+    "payload": {
+      "duration_ms": 5162.9
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "root_cause",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:05.646417+00:00",
+    "payload": {
+      "message": "Root Cause agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "root_cause",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:07.711373+00:00",
+    "payload": {
+      "confidence": 97.0,
+      "summary": "The incident was caused by the SQLAlchemy database connection pool size being reduced incorrectly during deployment from 20 to 5.",
+      "evidence": [
+        "Metrics analysis shows a correlation between error rate increase and anomaly in database connections.",
+        "Logs reveal multiple ‘sqlalchemy.exc.TimeoutError’ errors indicating connection issues.",
+        "Deployment details confirm change in configuration parameter ‘SQLALCHEMY_POOL_SIZE’ from 20 to 5, causing insufficient database connections."
+      ],
+      "metadata": {
+        "title": "Database Connection Pool Size Reduction",
+        "blast_radius": 5,
+        "affected_users": 12000,
+        "hourly_impact_usd": 12345.0
+      },
+      "duration_ms": 2065.0,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "root_cause",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:07.711373+00:00",
+    "payload": {
+      "duration_ms": 2065.0
+    }
+  },
+  {
+    "event_type": "root_cause.updated",
+    "agent_name": "root_cause",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:07.715353+00:00",
+    "payload": {
+      "confidence": 97.0,
+      "title": "Database Connection Pool Size Reduction",
+      "blast_radius": 5,
+      "affected_users": 12000,
+      "hourly_impact_usd": 12345.0,
+      "combined_confidence": 95.4,
+      "escalated": false
+    }
+  },
+  {
+    "event_type": "agent.started",
+    "agent_name": "recommendation",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:07.715381+00:00",
+    "payload": {
+      "message": "Recommendation agent started",
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.finding",
+    "agent_name": "recommendation",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:08.944972+00:00",
+    "payload": {
+      "confidence": 90.0,
+      "summary": "1 remediation action(s) identified.",
+      "evidence": [
+        "LIVE_RECOMMENDATION_TEST"
+      ],
+      "metadata": {
+        "actions": [
+          {
+            "id": "rec-live",
+            "type": "rollback",
+            "type_label": "Rollback",
+            "title": "LIVE_RECOMMENDATION_TEST",
+            "description": "Undo recent configuration change that reduced database connection pool size, which led to service degradation.",
+            "steps": [
+              "step one"
+            ],
+            "risk": "safe",
+            "risk_label": "Safe",
+            "impact": "high",
+            "impact_label": "High",
+            "estimated_time": "~5 min",
+            "priority": 1
+          }
+        ]
+      },
+      "duration_ms": 1229.6,
+      "mode": "live"
+    }
+  },
+  {
+    "event_type": "agent.completed",
+    "agent_name": "recommendation",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:08.944972+00:00",
+    "payload": {
+      "duration_ms": 1229.6
+    }
+  },
+  {
+    "event_type": "investigation.complete",
+    "agent_name": "orchestrator",
+    "incident_id": "LIVE-FORCED",
+    "timestamp": "2026-06-05T03:05:08.945974+00:00",
+    "payload": {
+      "incident_id": "LIVE-FORCED",
+      "root_cause_confidence": 97.0,
+      "combined_confidence": 95.4,
+      "escalated": false
+    }
+  }
+]
