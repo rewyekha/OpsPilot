@@ -41,6 +41,7 @@ import { GlobalSearch } from './GlobalSearch'
 import { IncidentStatusBadge } from '../shared/SeverityBadge'
 import { usePreferences } from '../../store/PreferencesContext'
 import { useSession } from '../../store/SessionContext'
+import { useInvestigationStream } from '../../store/InvestigationStreamContext'
 import { useNotify } from '../../store/NotificationContext'
 import { useRecommendations } from '../../hooks/useRecommendations'
 import { useAgentActivity } from '../../hooks/useAgentActivity'
@@ -76,6 +77,7 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
   const s = useStyles()
   const { timeZoneMode, toggleTimeZoneMode } = usePreferences()
   const { createInvestigation, timelineEvents, jobs, incidentStatus } = useSession()
+  const { startInvestigation } = useInvestigationStream()
   const notify = useNotify()
   const recState = useRecommendations(ACTIVE_INCIDENT_ID)
   const agentState = useAgentActivity(ACTIVE_INCIDENT_ID)
@@ -154,7 +156,9 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
                   appearance="primary"
                   disabled={desc.trim().length < 10}
                   onClick={() => {
-                    // Mock: creates a client-side investigation (no backend call).
+                    // Records the session event (timeline) AND launches exactly one
+                    // real backend investigation for the active incident. Viewing /
+                    // refreshing / reconnecting never triggers a run — only this.
                     createInvestigation({
                       description: desc.trim(),
                       affectedServices: services
@@ -162,10 +166,11 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
                         .map((x) => x.trim())
                         .filter(Boolean),
                     })
+                    void startInvestigation()
                     setNewOpen(false)
                     setDesc('')
                     setServices('')
-                    onNavigate?.('incidents')
+                    onNavigate?.('home')
                   }}
                 >
                   Dispatch Agents

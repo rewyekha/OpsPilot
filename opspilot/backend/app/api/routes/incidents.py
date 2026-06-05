@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.models.incident import (
     CreateIncidentRequest,
@@ -19,6 +19,7 @@ from app.models.incident import (
     IncidentStatus,
 )
 from app.services import incident_service
+from app.services.investigation_runner import start_investigation
 
 log = structlog.get_logger(__name__)
 
@@ -70,7 +71,6 @@ async def get_incident(incident_id: str) -> IncidentRecord:
 )
 async def create_incident(
     body: CreateIncidentRequest,
-    background_tasks: BackgroundTasks,
 ) -> IncidentRecord:
     now = datetime.now(timezone.utc)
     incident_id = f"INC-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
@@ -90,15 +90,8 @@ async def create_incident(
     incident_service.MOCK_INCIDENTS.append(incident)
     incident_service._INDEX[incident_id] = incident
 
-    # Kick off investigation in background — does not block the HTTP response
-    from app.agents.orchestrator import InvestigationOrchestrator
-    orchestrator = InvestigationOrchestrator()
-    background_tasks.add_task(
-        orchestrator.run,
-        incident_id,
-        body.description,
-        body.affected_services,
-    )
+    # Explicit user action → launch exactly one investigation (deduped by the runner).
+    await start_investigation(incident_id, body.description, body.affected_services)
 
     log.info(
         "incidents.created",
@@ -107,3 +100,30 @@ async def create_incident(
         affected_services=body.affected_services,
     )
     return incident
+
+
+@router.post(
+    "/{incident_id}/investigate",
+    summary="Launch the live investigation for an incident (explicit user action)",
+    description=(
+        "Starts the multi-agent investigation exactly once. Repeat calls while it is "
+        "running, or after it has completed, are ignored unless force=true. "
+        "Subscribing to the SSE stream does NOT trigger this."
+    ),
+    responses={404: {"description": "Incident not found"}},
+)
+async def investigate_incident(incident_id: str, force: bool = False) -> dict:
+    incident = await incident_service.get_incident_by_id(incident_id)
+    if incident is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident '{incident_id}' not found.",
+        )
+    result = await start_investigation(
+        incident_id,
+        getattr(incident, "description", ""),
+        getattr(incident, "affected_services", []),
+        force=force,
+    )
+    log.info("incidents.investigate", incident_id=incident_id, result=result, force=force)
+    return {"incident_id": incident_id, "status": result}

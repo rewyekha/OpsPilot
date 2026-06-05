@@ -108,6 +108,15 @@ class BaseAgent(ABC):
 
         try:
             if self._provider.is_live:
+                # One structured Foundry call per agent per investigation. Logged
+                # here (the single live chokepoint) so request counts are auditable:
+                #   [FOUNDRY_CALL] incident=... agent=... model=...
+                model = getattr(
+                    self._provider, "model_for", lambda r: getattr(r, "value", str(r))
+                )(self.model_role)
+                log.info(
+                    "FOUNDRY_CALL", incident_id=incident_id, agent=self.role, model=model
+                )
                 finding = await self._investigate(state)
             else:
                 finding = await self._mock_investigate(state)

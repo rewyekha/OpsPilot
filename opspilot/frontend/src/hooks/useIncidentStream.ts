@@ -1,72 +1,25 @@
 /**
- * useIncidentStream — native EventSource hook for SSE endpoint
+ * useIncidentStream — thin accessor over the app-wide InvestigationStreamProvider.
  *
- * Connects to: GET /api/incidents/{incidentId}/stream
- *
- * Backend emits events with event_type:
- *   agent.started | agent.finding | agent.completed |
- *   root_cause.updated | investigation.complete
+ * All pages (Dashboard, Agents, Timeline) call this, but they now share the
+ * SINGLE EventSource owned by the provider rather than each opening their own
+ * connection (which previously multiplied investigations). The incidentId arg
+ * is accepted for backwards compatibility; the provider streams the active
+ * incident.
  */
-import { useState, useEffect, useRef } from 'react'
+import {
+  useInvestigationStream,
+  type ConnectionStatus,
+  type StreamEvent,
+} from '../store/InvestigationStreamContext'
 
-export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
+export type { ConnectionStatus, StreamEvent }
 
-export interface StreamEvent {
-  event_type: string
-  agent_name: string
-  incident_id: string
-  timestamp: string
-  payload: Record<string, unknown>
-}
-
-const STREAM_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
-
-export function useIncidentStream(incidentId: string): {
+export function useIncidentStream(_incidentId: string): {
   status: ConnectionStatus
   lastEvent: StreamEvent | null
   events: StreamEvent[]
 } {
-  const [status, setStatus] = useState<ConnectionStatus>('reconnecting')
-  const [lastEvent, setLastEvent] = useState<StreamEvent | null>(null)
-  // Append-only log of every event. The functional update is batching-safe:
-  // even when React 18 coalesces several SSE messages into one render, each
-  // call still appends, so no event is dropped (unlike a single `lastEvent`).
-  const [events, setEvents] = useState<StreamEvent[]>([])
-  // Stable ref so the cleanup callback always closes the right instance
-  const esRef = useRef<EventSource | null>(null)
-
-  useEffect(() => {
-    setEvents([])
-    const url = `${STREAM_BASE}/api/incidents/${encodeURIComponent(incidentId)}/stream`
-    const es = new EventSource(url)
-    esRef.current = es
-
-    es.onopen = () => setStatus('connected')
-
-    es.onmessage = (ev: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(ev.data) as StreamEvent
-        setEvents((prev) => [...prev, data])
-        setLastEvent(data)
-      } catch {
-        // malformed frame — skip
-      }
-    }
-
-    es.onerror = () => {
-      // EventSource readyState: 0=CONNECTING, 1=OPEN, 2=CLOSED
-      if (es.readyState === EventSource.CLOSED) {
-        setStatus('disconnected')
-      } else {
-        setStatus('reconnecting')
-      }
-    }
-
-    return () => {
-      es.close()
-      esRef.current = null
-    }
-  }, [incidentId])
-
+  const { status, lastEvent, events } = useInvestigationStream()
   return { status, lastEvent, events }
 }

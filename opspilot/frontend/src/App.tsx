@@ -5,6 +5,7 @@ import { PreferencesProvider } from './store/PreferencesContext'
 import { FilterProvider } from './store/FilterContext'
 import { NotificationProvider } from './store/NotificationContext'
 import { SessionProvider } from './store/SessionContext'
+import { InvestigationStreamProvider } from './store/InvestigationStreamContext'
 
 export default function App() {
   return (
@@ -16,7 +17,9 @@ export default function App() {
         <FilterProvider>
           <NotificationProvider>
             <SessionProvider>
-              <AppShell />
+              <InvestigationStreamProvider>
+                <AppShell />
+              </InvestigationStreamProvider>
             </SessionProvider>
           </NotificationProvider>
         </FilterProvider>

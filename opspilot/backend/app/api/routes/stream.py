@@ -3,20 +3,20 @@
 Endpoint:
   GET /api/incidents/{incident_id}/stream
 
-Emits a real-time SSE stream driven by the InvestigationOrchestrator.
-When Azure OpenAI is not configured the orchestrator falls back to
-deterministic mock data — the SSE event sequence is identical in both paths.
+SUBSCRIBE-ONLY. This endpoint never launches an investigation — it only streams
+the events of one started explicitly via
+`POST /api/incidents/{incident_id}/investigate`. The event bus replays the
+retained history first, so connecting, reconnecting, or refreshing shows the
+full investigation without ever re-running the agents (no token burn).
 """
 from __future__ import annotations
 
-import asyncio
 import json
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.agents.orchestrator import InvestigationOrchestrator
 from app.services import incident_service
 from app.services.event_stream import get_event_stream
 
@@ -25,36 +25,16 @@ log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/incidents", tags=["stream"])
 
 
-async def _live_event_generator(incident_id: str, incident_description: str, affected_services: list[str]):
-    """Runs the orchestrator as a background task and streams its events via SSE."""
-    orchestrator = InvestigationOrchestrator()
-    event_stream = get_event_stream()
-
-    task = asyncio.create_task(
-        orchestrator.run(incident_id, incident_description, affected_services)
-    )
-
-    try:
-        async for event in event_stream.subscribe(incident_id):
-            yield f"data: {json.dumps(event)}\n\n"
-    finally:
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
-        else:
-            # Propagate any unhandled orchestrator exception to the log
-            exc = task.exception()
-            if exc is not None:
-                log.error("orchestrator.error", incident_id=incident_id, error=str(exc))
+async def _event_generator(incident_id: str):
+    """Subscribe-only: replay history then tail live events. Starts nothing."""
+    async for event in get_event_stream().subscribe(incident_id):
+        yield f"data: {json.dumps(event)}\n\n"
 
 
 @router.get(
     "/{incident_id}/stream",
-    summary="Stream agent activity events (SSE)",
-    description="Server-Sent Events stream of real-time agent activity for an incident.",
+    summary="Stream agent activity events (SSE) — subscribe-only",
+    description="Server-Sent Events stream of agent activity. Does NOT launch an investigation.",
     responses={
         200: {"content": {"text/event-stream": {}}},
         404: {"description": "Incident not found"},
@@ -67,13 +47,9 @@ async def stream_incident(incident_id: str) -> StreamingResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Incident '{incident_id}' not found.",
         )
-    log.info("stream.started", incident_id=incident_id)
+    log.info("stream.subscribed", incident_id=incident_id)
     return StreamingResponse(
-        _live_event_generator(
-            incident_id,
-            incident_description=getattr(incident, "description", str(incident_id)),
-            affected_services=getattr(incident, "affected_services", []),
-        ),
+        _event_generator(incident_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
