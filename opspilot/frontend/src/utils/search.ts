@@ -46,7 +46,7 @@ const INDEX: SearchResult[] = [
   { id: 'evt-deploy', category: 'timeline', title: 'v2.4.1 Deployment Started', subtitle: 'Deployment · CI/CD Pipeline', target: 'history' },
   { id: 'evt-rootcause', category: 'timeline', title: 'Root Cause Confirmed', subtitle: 'Root cause · Commander Agent · 94%', target: 'history' },
   { id: 'find-pool', category: 'finding', title: 'ORM connection pool exhaustion', subtitle: 'pool_size 20 → 5 regression in v2.4.1', target: 'agents' },
-  { id: 'find-latency', category: 'finding', title: 'P99 latency 23ms → 1,847ms', subtitle: 'checkout-service · Metrics Agent', target: 'agents' },
+  { id: 'find-latency', category: 'finding', title: 'P99 latency 23ms → 1,847ms', subtitle: 'Metrics Agent', target: 'agents' },
 ]
 
 function mockSearch(query: string): SearchResult[] {

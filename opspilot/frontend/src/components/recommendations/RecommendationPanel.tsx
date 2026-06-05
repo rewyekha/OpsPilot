@@ -54,6 +54,7 @@ import { SeverityBadge, AgentStatusBadge, RiskBadge, IncidentStatusBadge } from 
 import { ConfidenceBar } from '../shared/ConfidenceBar'
 import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { AgentDetailsDrawer } from '../agents/AgentDetailsDrawer'
+import { MonitoredServices } from '../services/MonitoredServices'
 import { RecommendationDrawer } from './RecommendationDrawer'
 import { ActionStatusBadge } from '../actions/ActionStatusBadge'
 import { useSession } from '../../store/SessionContext'
@@ -318,7 +319,8 @@ export const RecommendationPanel: React.FC = () => {
       <div className={s.headerRow}>
         <span className={s.sectionLabel}>Incident Summary</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <IncidentStatusBadge status={lifecycle} />
+          {/* Lifecycle status is shown once, in the Status KPI below (Phase 8 UX:
+              removed the duplicate badge here — the KPI is the single source). */}
           <Button
             size="small"
             appearance="secondary"
@@ -371,6 +373,9 @@ export const RecommendationPanel: React.FC = () => {
           </span>
         </Kpi>
       </div>
+
+      {/* ── Monitored services ─────────────────────────────────────────────── */}
+      <MonitoredServices />
 
       {/* ── Investigation queue ────────────────────────────────────────────── */}
       <span className={s.sectionLabel}>Investigation Queue</span>

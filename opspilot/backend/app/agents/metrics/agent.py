@@ -17,12 +17,8 @@ from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
 from app.providers.models import ModelRole
 from app.agents.metrics.prompts import METRICS_SYSTEM_PROMPT
-from app.tools.metrics_tools import (
-    query_db_connections,
-    query_error_rate,
-    query_latency_p99,
-    query_throughput,
-)
+from app.telemetry import get_telemetry_provider
+from app.tools.metrics_tools import query_db_connections
 
 
 class MetricsAnalysis(BaseModel):
@@ -47,11 +43,13 @@ class MetricsAgent(BaseAgent):
         services = state.affected_services or ["checkout-service"]
         primary = services[0]
 
-        # Gather metric data
-        error_rate = query_error_rate(primary)
-        latency = query_latency_p99(primary)
-        throughput = query_throughput(primary)
-        db_conns = query_db_connections(primary)
+        # Gather metric data from the active TelemetryProvider (synthetic | azure),
+        # so live mode reads real Azure Monitor metrics for the affected service.
+        tp = get_telemetry_provider()
+        error_rate = tp.query_error_rate(primary)
+        latency = tp.query_latency_p99(primary)
+        throughput = tp.query_throughput(primary)
+        db_conns = query_db_connections(primary)  # synthetic enrichment; {} for real svc
 
         tool_data = {
             "error_rate": {

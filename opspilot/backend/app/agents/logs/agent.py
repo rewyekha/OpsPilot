@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from app.agents.base import AgentFinding, BaseAgent
 from app.agents.state import OpsPilotState
 from app.providers.models import ModelRole
-from app.tools.logs_tools import query_connection_pool_stats, query_error_logs
+from app.telemetry import get_telemetry_provider
+from app.tools.logs_tools import query_connection_pool_stats
 
 LOGS_SYSTEM_PROMPT = """
 You are the Logs Agent for OpsPilot. Analyze application log data and return a structured finding.
@@ -56,8 +57,11 @@ class LogsAgent(BaseAgent):
         services = state.affected_services or ["checkout-service"]
         primary = services[0]
 
-        error_logs = query_error_logs(primary)
-        pool_stats = query_connection_pool_stats(primary)
+        # Error logs come from the active TelemetryProvider (synthetic | azure) so
+        # live mode reads real Azure Log Analytics / App Insights exceptions.
+        tp = get_telemetry_provider()
+        error_logs = tp.query_error_logs(primary)
+        pool_stats = query_connection_pool_stats(primary)  # synthetic enrichment; {} for real svc
 
         tool_data = {
             "error_logs": {

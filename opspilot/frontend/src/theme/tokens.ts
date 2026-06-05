@@ -121,6 +121,28 @@ export const LIFECYCLE_LABELS: Record<LifecycleKey, string> = {
 export const asLifecycle = (s: string): LifecycleKey =>
   LIFECYCLE_ORDER.includes(s as LifecycleKey) ? (s as LifecycleKey) : 'investigating'
 
+// ── Service health (Phase 8 — Monitored Services panel) ───────────────────────
+export type HealthKey = 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+
+export const HEALTH_COLORS: Record<HealthKey, ColorCfg> = {
+  healthy: cfg('#22c55e', '#4ade80'),
+  degraded: cfg('#f59e0b', '#fbbf24'),
+  unhealthy: cfg('#dc2626', '#f87171'),
+  unknown: cfg('#64748b', '#94a3b8', 0.12, 0.3),
+}
+
+export const HEALTH_LABELS: Record<HealthKey, string> = {
+  healthy: 'Healthy',
+  degraded: 'Degraded',
+  unhealthy: 'Unhealthy',
+  unknown: 'Unknown',
+}
+
+export const asHealth = (s: string): HealthKey =>
+  (['healthy', 'degraded', 'unhealthy', 'unknown'] as HealthKey[]).includes(s as HealthKey)
+    ? (s as HealthKey)
+    : 'unknown'
+
 // ── Timeline event type ───────────────────────────────────────────────────────
 export type TimelineTypeKey =
   | 'deployment'

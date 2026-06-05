@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     # mock | foundry | auto. Default "mock" so the app runs with zero credentials.
     execution_mode: str = "mock"
 
+    # ── Telemetry mode (Phase 8 — monitoring data source) ─────────────────────
+    # synthetic | azure. Default "synthetic" so the app runs with zero Azure
+    # access. "azure" routes the TelemetryProvider to real Application Insights /
+    # Log Analytics for the deployed demo workloads. The synthetic provider is
+    # never removed — it stays the offline/CI default.
+    telemetry_mode: str = "synthetic"
+
+    # Log Analytics workspace GUID (customerId) backing the workspace-based
+    # Application Insights. Required when TELEMETRY_MODE=azure.
+    azure_log_analytics_workspace_id: str = ""
+    # Application Insights connection string (shared by the demo workloads).
+    applicationinsights_connection_string: str = ""
+
     # ── Azure AI Foundry provider ─────────────────────────────────────────────
     foundry_endpoint: str = ""
     foundry_api_key: str = ""              # empty = use managed identity
@@ -38,8 +51,11 @@ class Settings(BaseSettings):
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""          # empty = use managed identity
     azure_openai_api_version: str = "2024-08-01-preview"
-    commander_model_deployment: str = "gpt-4o"
-    specialist_model_deployment: str = "gpt-4o-mini"
+    # Cost control (Phase 9): o4-mini ONLY — no gpt-4o / gpt-4o-mini. Every role
+    # defaults to o4-mini so a missing/partial .env can never select a pricier
+    # (or non-existent) deployment.
+    commander_model_deployment: str = "o4-mini"
+    specialist_model_deployment: str = "o4-mini"
     reasoning_model_deployment: str = "o4-mini"
 
     # ── Reasoning escalation ─────────────────────────────────────────────────

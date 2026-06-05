@@ -1,0 +1,112 @@
+#!/usr/bin/env node
+
+/**
+ * Application Insights instrumentation (OpsPilot Phase 9).
+ *
+ * Must run BEFORE any other require so the SDK can patch the http module and
+ * auto-collect requests / exceptions / dependencies. No-op when the connection
+ * string env var is absent, so local runs are unaffected. The cloud role name is
+ * set to OPSPILOT_SERVICE_NAME so it shows up as `AppRoleName` in App Insights /
+ * Log Analytics — which is exactly what OpsPilot's discovery + provider query.
+ */
+var aiConnectionString = process.env.APPLICATIONINSIGHTS_CONNECTION_STRING;
+if (aiConnectionString) {
+  var appInsights = require("applicationinsights");
+  appInsights
+    .setup(aiConnectionString)
+    .setAutoCollectRequests(true)
+    .setAutoCollectExceptions(true)
+    .setAutoCollectDependencies(true)
+    .setAutoCollectPerformance(true, true)
+    .setSendLiveMetrics(false)
+    .start();
+  appInsights.defaultClient.context.tags[
+    appInsights.defaultClient.context.keys.cloudRole
+  ] = process.env.OPSPILOT_SERVICE_NAME || "album-api";
+  console.log("Application Insights instrumentation enabled");
+}
+
+/**
+ * Module dependencies.
+ */
+
+var app = require("../app");
+var debug = require("debug")("containerapps-albumapi-javascript:server");
+var http = require("http");
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || "8080");
+app.set("port", port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on("error", onError);
+server.on("listening", onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== "listen") {
+    throw error;
+  }
+
+  var bind = typeof port === "string" ? "Pipe " + port : "Port " + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case "EACCES":
+      console.error(bind + " requires elevated privileges");
+      process.exit(1);
+      break;
+    case "EADDRINUSE":
+      console.error(bind + " is already in use");
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+  console.log("Listening on " + bind);
+}

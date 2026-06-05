@@ -133,7 +133,7 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
                     <Textarea
                       value={desc}
                       onChange={(_, d) => setDesc(d.value)}
-                      placeholder="e.g. Checkout service returning 5xx after v2.4.1 deploy"
+                      placeholder="e.g. API returning 5xx errors after the latest deploy"
                       rows={3}
                     />
                   </Field>
@@ -141,7 +141,7 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
                     <Input
                       value={services}
                       onChange={(_, d) => setServices(d.value)}
-                      placeholder="checkout-service, payment-gateway"
+                      placeholder="Comma-separated service names"
                     />
                   </Field>
                 </div>
