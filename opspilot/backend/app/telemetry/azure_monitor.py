@@ -76,14 +76,32 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
         return LogsQueryClient(DefaultAzureCredential())
 
     def _query(self, kql: str, window_minutes: int = 15) -> list[dict[str, Any]]:
-        """Run a KQL query against the workspace, returning a list of row dicts."""
+        """Run a KQL query against the workspace, returning a list of row dicts.
+
+        Resilient by design: any failure (KQL syntax error, transient service
+        error, a not-yet-created table) is logged and returns [] — so one bad
+        query degrades gracefully to "no data" and never propagates an exception
+        that would crash an agent into its mock fallback.
+        """
         from azure.monitor.query import LogsQueryStatus
 
-        response = self._client.query_workspace(
-            workspace_id=self._workspace_id,
-            query=kql,
-            timespan=timedelta(minutes=window_minutes),
-        )
+        try:
+            response = self._client.query_workspace(
+                workspace_id=self._workspace_id,
+                query=kql,
+                timespan=timedelta(minutes=window_minutes),
+            )
+        except Exception as exc:  # noqa: BLE001 - never let telemetry crash an agent
+            msg = str(exc)
+            # A semantic error (SEM0xxx) means a referenced table/column doesn't
+            # exist yet — expected for optional tables (e.g. ContainerAppConsoleLogs_CL
+            # before any Container App has logged). Degrade silently; don't warn.
+            if "SemanticError" in msg or "SEM0" in msg or "Failed to resolve" in msg:
+                log.debug("telemetry.azure.table_absent", extra={"error": msg})
+            else:
+                log.warning("telemetry.azure.query_failed", extra={"error": msg})
+            return []
+
         if response.status != LogsQueryStatus.SUCCESS or not response.tables:
             log.warning("telemetry.azure.query_empty", extra={"status": str(response.status)})
             return []
@@ -116,17 +134,16 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
                 discovered.add(str(name))
 
         # Source 2 — Container Apps console logs (works without any SDK).
-        try:
-            for r in self._query(
-                "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(24h) "
-                "| where isnotempty(ContainerAppName_s) | distinct ContainerAppName_s",
-                window_minutes=60 * 24,
-            ):
-                name = r.get("ContainerAppName_s")
-                if name:
-                    discovered.add(str(name))
-        except Exception as exc:  # pragma: no cover - table may not exist yet
-            log.warning("telemetry.azure.console_logs_unavailable", extra={"error": str(exc)})
+        # _query is resilient (returns [] if the table doesn't exist yet), so no
+        # try/except is needed and no console_logs_unavailable warning is emitted.
+        for r in self._query(
+            "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(24h) "
+            "| where isnotempty(ContainerAppName_s) | distinct ContainerAppName_s",
+            window_minutes=60 * 24,
+        ):
+            name = r.get("ContainerAppName_s")
+            if name:
+                discovered.add(str(name))
 
         return sorted(discovered)
 
@@ -239,39 +256,43 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
     # ── Logs ──────────────────────────────────────────────────────────────────
 
     def query_error_logs(self, service: str, window_minutes: int = 30) -> LogQueryResult:
+        # NOTE: `first` is a RESERVED KQL keyword — using it as a summarize output
+        # column name fails to parse (SYN0002: "could not be parsed at 'first'").
+        # Aliases below are all non-reserved; `take_any()` replaces the deprecated
+        # `any()`. Validated against Azure Monitor KQL.
         rows = self._query(
             f"""
             AppExceptions | where AppRoleName == "{service}"
-            | summarize count = count(), first = min(TimeGenerated),
-                        sample = any(OuterMessage), stack = any(Details)
-                by type = ExceptionType
-            | order by count desc
+            | summarize errorCount = count(), firstSeen = min(TimeGenerated),
+                        sample = take_any(OuterMessage), stack = take_any(Details)
+                by exceptionType = ExceptionType
+            | order by errorCount desc
             """,
             window_minutes=window_minutes,
         )
         if not rows:
             return LogQueryResult(service=service, total_errors=0, error_types=[])
-        total = int(sum(int(r.get("count") or 0) for r in rows))
+        total = int(sum(int(r.get("errorCount") or 0) for r in rows))
         error_types = [
-            {"type": r.get("type"), "count": int(r.get("count") or 0),
+            {"type": r.get("exceptionType"), "count": int(r.get("errorCount") or 0),
              "message": r.get("sample") or ""}
             for r in rows
         ]
         top = rows[0]
         sample = LogEntry(
-            timestamp=str(top.get("first")),
+            timestamp=str(top.get("firstSeen")),
             service=service,
             severity="ERROR",
             message=top.get("sample") or "",
             stack_trace=str(top.get("stack") or ""),
-            count=int(top.get("count") or 0),
+            count=int(top.get("errorCount") or 0),
         )
         return LogQueryResult(
             service=service,
             total_errors=total,
             error_types=error_types,
             sample_entries=[sample],
-            first_occurrence=str(top.get("first")),
+            first_occurrence=str(top.get("firstSeen")),
             error_rate_per_minute=round(total / max(window_minutes, 1), 1),
         )
 
