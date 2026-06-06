@@ -6,7 +6,6 @@ import {
 } from '../../hooks/useIncident'
 import { useSession } from '../../store/SessionContext'
 import { IncidentStatusBadge } from '../shared/SeverityBadge'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -552,7 +551,7 @@ export const IncidentPanel: React.FC = () => {
           <div className={s.header}>
             {/* Status chip + Incident ID */}
             <div className={s.headerTopRow}>
-              <IncidentStatusBadge status={incidentStatus(ACTIVE_INCIDENT_ID)} />
+              <IncidentStatusBadge status={incidentStatus(incident.id)} />
               <span className={s.incidentId}>{incident.id}</span>
             </div>
 

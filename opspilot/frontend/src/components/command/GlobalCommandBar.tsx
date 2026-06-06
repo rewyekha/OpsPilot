@@ -43,7 +43,7 @@ import { usePreferences } from '../../store/PreferencesContext'
 import { useSession } from '../../store/SessionContext'
 import { useNotify } from '../../store/NotificationContext'
 import { useActiveSnapshot } from '../../hooks/useActiveSnapshot'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
+import { EXPORT_STEM } from '../../utils/constants'
 import { buildSnapshot, downloadBlob } from '../../utils/incidentExport'
 import { ReportDrawer } from '../report/ReportDrawer'
 
@@ -75,7 +75,8 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
   const { timeZoneMode, toggleTimeZoneMode } = usePreferences()
   const { createInvestigation, incidentStatus } = useSession()
   const notify = useNotify()
-  const { ready, buildInput } = useActiveSnapshot()
+  const { ready, incidentId, buildInput } = useActiveSnapshot()
+  const exportStem = incidentId ?? EXPORT_STEM
   const [newOpen, setNewOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [desc, setDesc] = useState('')
@@ -87,8 +88,8 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
       return
     }
     const snapshot = buildSnapshot(buildInput())
-    downloadBlob(`${ACTIVE_INCIDENT_ID}-snapshot.json`, JSON.stringify(snapshot, null, 2), 'application/json')
-    notify({ title: 'Incident exported', body: `${ACTIVE_INCIDENT_ID}-snapshot.json`, intent: 'success' })
+    downloadBlob(`${exportStem}-snapshot.json`, JSON.stringify(snapshot, null, 2), 'application/json')
+    notify({ title: 'Incident exported', body: `${exportStem}-snapshot.json`, intent: 'success' })
   }
 
   const handleReport = () => {
@@ -174,8 +175,8 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
       <div className={s.spacer} />
 
       <div className={s.right}>
-        {/* Persistent lifecycle status — visible on every page (Dashboard, Incidents, History, Agents) */}
-        <IncidentStatusBadge status={incidentStatus(ACTIVE_INCIDENT_ID)} />
+        {/* Lifecycle status of the active incident — only when a real one exists. */}
+        {incidentId ? <IncidentStatusBadge status={incidentStatus(incidentId)} /> : null}
         <GlobalSearch onNavigate={onNavigate} />
         <Tooltip
           content={`Showing ${timeZoneMode === 'utc' ? 'UTC' : 'local'} time — click to switch`}

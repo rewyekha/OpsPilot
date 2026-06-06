@@ -7,8 +7,8 @@ The frontend Agent Activity Stream panel renders these events in real-time.
 Event envelope:
   {
     "event_type": "agent.finding",
-    "incident_id": "INC-2024-0847",
-    "timestamp": "2024-11-29T14:27:03Z",
+    "incident_id": "INC-<service>",   # real, telemetry-derived id (never seeded)
+    "timestamp": "2026-06-06T14:27:03Z",
     "payload": { ... }
   }
 """

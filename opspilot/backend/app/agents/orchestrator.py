@@ -99,7 +99,7 @@ class InvestigationOrchestrator:
             AgentExecution(
                 role=role,
                 role_label=role_label,
-                status="complete",
+                status="failed" if meta.get("failed") else "complete",
                 confidence=float(getattr(finding, "confidence", 0.0) or 0.0),
                 duration_seconds=round((meta.get("_duration_ms", 0.0) or 0.0) / 1000.0, 2),
                 finding=getattr(finding, "summary", "") or "",

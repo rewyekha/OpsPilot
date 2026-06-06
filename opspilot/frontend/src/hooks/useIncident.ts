@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import type { ApiIncidentRecord } from '../api/incidents'
 import type { ApiRecommendationResponse } from '../api/recommendations'
 import { insightsApi, type InvestigationRecord } from '../api/insights'
-import { ACTIVE_INCIDENT_ID } from '../utils/constants'
 
 export interface IncidentWithRec {
   incident: ApiIncidentRecord
@@ -66,7 +65,7 @@ export function useActiveIncidentWithRecommendations(): FetchState<IncidentWithR
   useEffect(() => {
     let cancelled = false
     insightsApi
-      .latest(ACTIVE_INCIDENT_ID)
+      .latest()
       .then((rec) => {
         if (cancelled) return
         if (!rec) {

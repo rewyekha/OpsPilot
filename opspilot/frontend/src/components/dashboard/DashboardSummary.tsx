@@ -7,7 +7,6 @@ import React, { useMemo } from 'react'
 import { makeStyles, tokens } from '@fluentui/react-components'
 import { useLatestInvestigation } from '../../hooks/useInsights'
 import { useSession } from '../../store/SessionContext'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
 import { confidenceColor, LIFECYCLE_LABELS, asLifecycle } from '../../theme/tokens'
 import { formatDuration } from '../../utils/formatters'
 
@@ -30,10 +29,10 @@ const useStyles = makeStyles({
 
 export const DashboardSummary: React.FC = () => {
   const s = useStyles()
-  const { data: record } = useLatestInvestigation(ACTIVE_INCIDENT_ID)
+  const { data: record } = useLatestInvestigation()
   const { incidentStatus } = useSession()
 
-  const status = asLifecycle(incidentStatus(ACTIVE_INCIDENT_ID))
+  const status = asLifecycle(incidentStatus(record?.incident_id ?? ''))
   const agents = useMemo(() => record?.agents ?? [], [record])
   const confidence = record?.combined_confidence ?? 0
   const recCount = record?.recommendations.length ?? 0

@@ -8,25 +8,28 @@
 import { useCallback } from 'react'
 import { useSession } from '../store/SessionContext'
 import { useLatestInvestigation } from './useInsights'
-import { ACTIVE_INCIDENT_ID } from '../utils/constants'
 import { type SnapshotInput } from '../utils/incidentExport'
 
 export interface ActiveSnapshot {
-  /** True once a real investigation has completed for this incident. */
+  /** True once a real investigation has completed. */
   ready: boolean
+  /** The real incident id of the latest investigation, or null when none exists. */
+  incidentId: string | null
   buildInput: () => SnapshotInput
 }
 
 export function useActiveSnapshot(): ActiveSnapshot {
   const { timelineEvents, jobs, incidentStatus } = useSession()
-  const { data: record } = useLatestInvestigation(ACTIVE_INCIDENT_ID)
+  // Latest REAL investigation (any incident) — no hardcoded id.
+  const { data: record } = useLatestInvestigation()
 
   const ready = Boolean(record)
+  const incidentId = record?.incident_id ?? null
 
   const buildInput = useCallback(
     (): SnapshotInput => ({
-      incidentId: ACTIVE_INCIDENT_ID,
-      status: incidentStatus(ACTIVE_INCIDENT_ID),
+      incidentId: incidentId ?? '',
+      status: incidentStatus(incidentId ?? ''),
       incident: record
         ? {
             id: record.incident_id,
@@ -75,8 +78,8 @@ export function useActiveSnapshot(): ActiveSnapshot {
       sessionEvents: timelineEvents,
       generatedAt: new Date().toISOString(),
     }),
-    [record, incidentStatus, jobs, timelineEvents],
+    [record, incidentId, incidentStatus, jobs, timelineEvents],
   )
 
-  return { ready, buildInput }
+  return { ready, incidentId, buildInput }
 }

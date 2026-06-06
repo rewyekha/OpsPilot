@@ -4,10 +4,10 @@
  * progress: every agent transition (pending → running → complete) comes from an
  * actual agent.started / agent.finding / agent.completed event.
  *
- * One EventSource per incident (opening it triggers the real orchestrator run on
- * the backend). Aggregates the stream into an ordered agent roster + live
- * combined confidence + run status, so the dashboard queue reflects actual
- * execution state.
+ * One EventSource per incident. The stream is READ-ONLY: opening it never starts a
+ * run (only POST /investigate does), so navigation/reconnect cannot restart agents.
+ * The queue starts EMPTY and is populated only by real events — an idle system with
+ * no active run shows no agents, not a fabricated "pending" roster.
  */
 import { useEffect, useRef, useState } from 'react'
 
@@ -50,7 +50,9 @@ const LABELS: Record<string, string> = {
   reasoning: 'Deep Reasoning',
 }
 
-function initialAgents(): LiveAgent[] {
+// The pending roster — shown only AFTER a real `investigation.started` event,
+// never as an idle default.
+function rosterPending(): LiveAgent[] {
   return ROSTER.map((r) => ({ role: r.role, label: r.label, status: 'pending', confidence: 0, finding: '', durationMs: 0 }))
 }
 
@@ -65,12 +67,17 @@ export interface LiveInvestigation {
 export function useLiveInvestigation(incidentId: string): LiveInvestigation {
   const [connection, setConnection] = useState<ConnectionStatus>('reconnecting')
   const [status, setStatus] = useState<LiveStatus>('idle')
-  const [agents, setAgents] = useState<LiveAgent[]>(initialAgents)
+  const [agents, setAgents] = useState<LiveAgent[]>([])
   const [confidence, setConfidence] = useState<number | null>(null)
   const [escalated, setEscalated] = useState(false)
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
+    // No active incident → no stream, empty queue (never a fabricated roster).
+    if (!incidentId) {
+      setConnection('disconnected'); setStatus('idle'); setAgents([])
+      return
+    }
     const url = `${STREAM_BASE}/api/incidents/${encodeURIComponent(incidentId)}/stream`
     const es = new EventSource(url)
     esRef.current = es
@@ -98,7 +105,7 @@ export function useLiveInvestigation(incidentId: string): LiveInvestigation {
       const role = e.agent_name
       switch (e.event_type) {
         case 'investigation.started':
-          setStatus('running'); setAgents(initialAgents()); setConfidence(null); setEscalated(false)
+          setStatus('running'); setAgents(rosterPending()); setConfidence(null); setEscalated(false)
           break
         case 'agent.started':
           setStatus('running')

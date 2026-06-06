@@ -35,7 +35,7 @@ import {
   snapshotToMarkdown,
   downloadBlob,
 } from '../../utils/incidentExport'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
+import { EXPORT_STEM } from '../../utils/constants'
 
 const APP_VERSION = '1.0.0'
 
@@ -127,12 +127,13 @@ export const SettingsPanel: React.FC = () => {
       return
     }
     const input = buildInput()
+    const stem = input.incidentId || EXPORT_STEM
     if (fmt === 'json') {
-      downloadBlob(`${ACTIVE_INCIDENT_ID}-snapshot.json`, JSON.stringify(buildSnapshot(input), null, 2), 'application/json')
-      notify({ title: 'Exported JSON', body: `${ACTIVE_INCIDENT_ID}-snapshot.json`, intent: 'success' })
+      downloadBlob(`${stem}-snapshot.json`, JSON.stringify(buildSnapshot(input), null, 2), 'application/json')
+      notify({ title: 'Exported JSON', body: `${stem}-snapshot.json`, intent: 'success' })
     } else {
-      downloadBlob(`${ACTIVE_INCIDENT_ID}-report.md`, snapshotToMarkdown(input), 'text/markdown')
-      notify({ title: 'Exported Markdown', body: `${ACTIVE_INCIDENT_ID}-report.md`, intent: 'success' })
+      downloadBlob(`${stem}-report.md`, snapshotToMarkdown(input), 'text/markdown')
+      notify({ title: 'Exported Markdown', body: `${stem}-report.md`, intent: 'success' })
     }
   }
 

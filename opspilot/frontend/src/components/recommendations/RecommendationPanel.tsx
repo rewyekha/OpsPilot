@@ -59,7 +59,6 @@ import { RecommendationDrawer } from './RecommendationDrawer'
 import { ActionStatusBadge } from '../actions/ActionStatusBadge'
 import { useSession } from '../../store/SessionContext'
 import { useFormatters } from '../../store/PreferencesContext'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
 import { formatCurrency, formatCompactNumber, formatDuration } from '../../utils/formatters'
 import { confidenceColor } from '../../theme/tokens'
 
@@ -253,9 +252,11 @@ export const RecommendationPanel: React.FC = () => {
   // Single source of truth — the latest persisted investigation. The incident
   // summary, confidence, blast radius, cost and recommendations all come from a
   // real completed run (or the empty state); nothing is seeded from static data.
-  const latest = useLatestInvestigation(ACTIVE_INCIDENT_ID)
+  const latest = useLatestInvestigation()
   // Live investigation queue — driven entirely by real SSE orchestrator events.
-  const live = useLiveInvestigation(ACTIVE_INCIDENT_ID)
+  // Watches the latest real investigation's incident (read-only; opening the
+  // stream never starts a run). Empty id → no stream, empty queue.
+  const live = useLiveInvestigation(latest.data?.incident_id ?? '')
   const streamStatus = live.connection
   const { jobs, timelineEvents, incidentStatus } = useSession()
   const fmt = useFormatters()
@@ -285,7 +286,7 @@ export const RecommendationPanel: React.FC = () => {
 
   // Confidence: live (SSE) while running, else the real persisted value.
   const confidence = live.confidence ?? record?.combined_confidence ?? 0
-  const lifecycle = incidentStatus(ACTIVE_INCIDENT_ID)
+  const lifecycle = incidentStatus(record?.incident_id ?? '')
 
   if (latest.loading) {
     return (
@@ -316,6 +317,7 @@ export const RecommendationPanel: React.FC = () => {
       </div>
 
       {hasRecord && record && rootCause ? (
+        <>
         <div className={s.summary}>
           <Kpi label="Incident">
             <span className={mergeClasses(s.kpiValue, s.mono)}>{record.incident_id}</span>
@@ -346,6 +348,12 @@ export const RecommendationPanel: React.FC = () => {
             </span>
           </Kpi>
         </div>
+        {rootCause.blast_radius || rootCause.affected_users || rootCause.hourly_impact_usd ? (
+          <div style={{ fontSize: '11px', color: tokens.colorNeutralForeground4, marginTop: '2px' }}>
+            Blast radius, affected users and cost impact are estimated by the Root Cause agent from telemetry evidence.
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className={s.card}>
           <EmptyState
@@ -395,7 +403,7 @@ export const RecommendationPanel: React.FC = () => {
                   duration_seconds: a.durationMs / 1000,
                   finding: a.finding,
                   evidence: [],
-                  incident_id: ACTIVE_INCIDENT_ID,
+                  incident_id: record?.incident_id ?? '',
                 })
               return (
                 <TableRow

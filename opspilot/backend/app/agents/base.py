@@ -114,11 +114,18 @@ class BaseAgent(ABC):
                 incident_id=incident_id,
                 error=str(exc),
             )
-            # Degrade gracefully to mock
-            finding = await self._mock_investigate(state)
-            finding.confidence = max(finding.confidence - 10.0, 0.0)
+            # NO mock fallback — never fabricate telemetry. Emit an explicit, empty
+            # failed finding so the UI shows "investigation incomplete" instead of
+            # invented incident data. The orchestrator records this as status=failed.
+            finding = AgentFinding(
+                role=self.role,
+                summary=f"{self.role_label} agent could not complete (live error).",
+                evidence=[],
+                confidence=0.0,
+                metadata={"failed": True, "error": str(exc)},
+            )
             log.warning(
-                "agent.fallback_to_mock",
+                "agent.failed_no_fallback",
                 agent=self.role,
                 reason=str(exc),
             )

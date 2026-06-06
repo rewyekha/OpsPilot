@@ -23,7 +23,7 @@ import { useActiveSnapshot } from '../../hooks/useActiveSnapshot'
 import { useSession } from '../../store/SessionContext'
 import { useNotify } from '../../store/NotificationContext'
 import { useFormatters } from '../../store/PreferencesContext'
-import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
+import { EXPORT_STEM } from '../../utils/constants'
 import { confidenceColor } from '../../theme/tokens'
 import { formatCurrency, formatDuration } from '../../utils/formatters'
 import { snapshotToMarkdown, downloadBlob } from '../../utils/incidentExport'
@@ -76,7 +76,9 @@ export const InvestigationBlade: React.FC<{ open: boolean; onClose: () => void }
   const agents = input.agents ?? []
   const actions = input.actions ?? []
   const events = input.sessionEvents ?? []
-  const status = incidentStatus(ACTIVE_INCIDENT_ID)
+  // Real incident id from the snapshot (latest investigation). Empty → no active incident.
+  const incidentId = input.incident?.id ?? ''
+  const status = incidentStatus(incidentId)
   const confidence = rc?.confidence ?? 0
   const totalDuration = agents.reduce((sum, a) => sum + (a.duration_seconds ?? 0), 0)
   const evidence = agents.flatMap((a) => a.evidence ?? [])
@@ -87,7 +89,7 @@ export const InvestigationBlade: React.FC<{ open: boolean; onClose: () => void }
   const rerun = async () => {
     setRerunning(true)
     try {
-      const res = await investigationsApi.rerun(ACTIVE_INCIDENT_ID)
+      const res = await investigationsApi.rerun(incidentId)
       if (res.status === 'already_running') {
         notify({ title: 'Investigation already running', body: 'A run is in progress for this incident.', intent: 'info' })
       } else {
@@ -109,8 +111,8 @@ export const InvestigationBlade: React.FC<{ open: boolean; onClose: () => void }
       const findings = agents
         .filter((a) => a.finding)
         .map((a) => ({ role: a.role, summary: a.finding, evidence: a.evidence ?? [], confidence: a.confidence }))
-      const result = await investigationsApi.deepReasoning(ACTIVE_INCIDENT_ID, {
-        incident_description: input.incident?.description ?? rc?.title ?? ACTIVE_INCIDENT_ID,
+      const result = await investigationsApi.deepReasoning(incidentId, {
+        incident_description: input.incident?.description ?? rc?.title ?? incidentId,
         findings,
         root_cause: rc ? { role: 'root_cause', summary: rc.description, evidence: rc.evidence ?? [], confidence: rc.confidence } : null,
       })
@@ -124,8 +126,9 @@ export const InvestigationBlade: React.FC<{ open: boolean; onClose: () => void }
   }
 
   const exportRca = () => {
-    downloadBlob(`${ACTIVE_INCIDENT_ID}-RCA.md`, snapshotToMarkdown(input), 'text/markdown')
-    notify({ title: 'RCA exported', body: `${ACTIVE_INCIDENT_ID}-RCA.md`, intent: 'success' })
+    const stem = incidentId || EXPORT_STEM
+    downloadBlob(`${stem}-RCA.md`, snapshotToMarkdown(input), 'text/markdown')
+    notify({ title: 'RCA exported', body: `${stem}-RCA.md`, intent: 'success' })
   }
 
   return (
@@ -133,15 +136,15 @@ export const InvestigationBlade: React.FC<{ open: boolean; onClose: () => void }
       open={open}
       onClose={onClose}
       title={rc?.title ?? 'Active Investigation'}
-      subtitle={ACTIVE_INCIDENT_ID}
+      subtitle={incidentId || '—'}
       headerBadge={<IncidentStatusBadge status={status} />}
       actions={
         <>
-          <Button appearance="primary" size="small" icon={rerunning ? <Spinner size="tiny" /> : <ArrowSyncRegular />} disabled={rerunning} onClick={rerun}>Re-run Investigation</Button>
-          <Button size="small" icon={reasoningLoading ? <Spinner size="tiny" /> : <BrainCircuitRegular />} disabled={reasoningLoading} onClick={deepReasoning}>Deep Reasoning</Button>
+          <Button appearance="primary" size="small" icon={rerunning ? <Spinner size="tiny" /> : <ArrowSyncRegular />} disabled={rerunning || !incidentId} onClick={rerun}>Re-run Investigation</Button>
+          <Button size="small" icon={reasoningLoading ? <Spinner size="tiny" /> : <BrainCircuitRegular />} disabled={reasoningLoading || !incidentId} onClick={deepReasoning}>Deep Reasoning</Button>
           <Button size="small" icon={<DocumentArrowDownRegular />} onClick={exportRca}>Export RCA</Button>
-          <Button size="small" icon={<CheckmarkCircleRegular />} disabled={!canResolve} onClick={() => markResolved(ACTIVE_INCIDENT_ID)}>Mark Resolved</Button>
-          <Button size="small" icon={<LockClosedRegular />} disabled={!canClose} onClick={() => closeIncident(ACTIVE_INCIDENT_ID)}>Close</Button>
+          <Button size="small" icon={<CheckmarkCircleRegular />} disabled={!canResolve} onClick={() => markResolved(incidentId)}>Mark Resolved</Button>
+          <Button size="small" icon={<LockClosedRegular />} disabled={!canClose} onClick={() => closeIncident(incidentId)}>Close</Button>
         </>
       }
     >

@@ -86,9 +86,9 @@ async def create_incident(
         updated_at=now,
     )
 
-    # Register in the in-memory index so GET /api/incidents/{id} resolves immediately
-    incident_service.MOCK_INCIDENTS.append(incident)
-    incident_service._INDEX[incident_id] = incident
+    # Register the explicitly user-created incident so GET /api/incidents/{id}
+    # resolves immediately (this is an allowed, non-telemetry incident source).
+    incident_service.register_user_incident(incident)
 
     # Kick off investigation in background — does not block the HTTP response
     from app.agents.orchestrator import InvestigationOrchestrator

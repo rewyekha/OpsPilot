@@ -21,7 +21,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { ApiRecommendedAction } from '../api/recommendations'
 import { useNotify } from './NotificationContext'
-import { ACTIVE_INCIDENT_ID } from '../utils/constants'
 import { LIFECYCLE_LABELS, type LifecycleKey } from '../theme/tokens'
 
 // ── Action execution ──────────────────────────────────────────────────────────
@@ -179,7 +178,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const existing = jobs[action.id]
       if (existing && (existing.status === 'submitting' || existing.status === 'running')) return
 
-      const incidentId = action.incident_id || ACTIVE_INCIDENT_ID
+      const incidentId = action.incident_id
       const jobId = nextId('JOB')
       const submittedAt = new Date().toISOString()
 
