@@ -22,7 +22,7 @@ function fromRecord(rec: InvestigationRecord): IncidentWithRec {
     id: rec.incident_id,
     description: rec.description,
     status: 'investigating',
-    severity: rec.severity || 'P2',
+    severity: rec.severity, // real (commander LLM) or '' → empty state; never a default
     affected_services: [],
     reporter: 'orchestrator',
     created_at: rec.started_at,

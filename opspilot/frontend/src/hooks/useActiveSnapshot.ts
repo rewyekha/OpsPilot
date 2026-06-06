@@ -32,7 +32,7 @@ export function useActiveSnapshot(): ActiveSnapshot {
             id: record.incident_id,
             description: record.description,
             status: 'investigating',
-            severity: record.severity || 'P2',
+            severity: record.severity, // real (commander LLM) or '' → empty; never a default
             affected_services: [],
             reporter: 'orchestrator',
             created_at: record.started_at,

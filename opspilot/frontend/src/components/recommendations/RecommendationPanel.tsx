@@ -335,12 +335,14 @@ export const RecommendationPanel: React.FC = () => {
           </Kpi>
           <Kpi label="Blast Radius">
             <span className={s.kpiValue}>
-              {rootCause.blast_radius} svc · {formatCompactNumber(rootCause.affected_users)} users
+              {rootCause.blast_radius || rootCause.affected_users
+                ? `${rootCause.blast_radius} svc · ${formatCompactNumber(rootCause.affected_users)} users`
+                : '—'}
             </span>
           </Kpi>
           <Kpi label="Cost Impact">
             <span className={s.kpiValue} style={{ color: '#f87171' }}>
-              {formatCurrency(rootCause.hourly_impact_usd)}/hr
+              {rootCause.hourly_impact_usd ? `${formatCurrency(rootCause.hourly_impact_usd)}/hr` : '—'}
             </span>
           </Kpi>
         </div>
