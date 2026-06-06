@@ -479,11 +479,14 @@ export const RecommendationPanel: React.FC = () => {
       </>
       )}
 
-      {/* ── Live activity (session events: executions, investigations) ──────── */}
-      {timelineEvents.length > 0 && (
-        <>
-          <span className={s.sectionLabel}>Live Activity</span>
-          <div className={s.activity}>
+      {/* ── Live activity (real operator/investigation session events) ──────── */}
+      <span className={s.sectionLabel}>Live Activity</span>
+      {timelineEvents.length === 0 ? (
+        <div style={{ fontSize: '12px', color: tokens.colorNeutralForeground4, padding: '4px 0' }}>
+          No investigation activity
+        </div>
+      ) : (
+        <div className={s.activity}>
             {[...timelineEvents].reverse().map((e) => {
               const color =
                 e.kind === 'action_succeeded'
@@ -504,8 +507,7 @@ export const RecommendationPanel: React.FC = () => {
                 </div>
               )
             })}
-          </div>
-        </>
+        </div>
       )}
 
       {/* ── Drawers / blades ───────────────────────────────────────────────── */}

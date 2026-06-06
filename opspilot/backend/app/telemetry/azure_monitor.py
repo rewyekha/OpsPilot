@@ -42,6 +42,14 @@ _ERROR_RATE_UNHEALTHY = 10.0  # %  — failing
 _LATENCY_DEGRADED_MS = 250.0
 _LATENCY_UNHEALTHY_MS = 1000.0
 
+# A workload is "monitored" only if it emitted telemetry within this window.
+# This is the ONLY telemetry-based signal that a service still exists: Log
+# Analytics / Application Insights retain historical rows for the workspace
+# retention period (e.g. 30 days), so a DELETED Container App keeps appearing in
+# `distinct AppRoleName` over a wide window. Scoping discovery to recent activity
+# drops a deleted workload promptly (within this window) instead of for ~24h.
+_DISCOVERY_WINDOW_MIN = 15
+
 
 class AzureMonitorTelemetryProvider(TelemetryProvider):
     """Live telemetry from Azure Monitor (App Insights + Log Analytics)."""
@@ -122,12 +130,15 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
         "No monitored Azure services discovered" empty state).
         """
         discovered: set[str] = set()
+        win = _DISCOVERY_WINDOW_MIN
 
         # Source 1 — Application Insights role names (instrumented workloads).
+        # Scoped to recent activity so a deleted workload (whose historical rows
+        # linger in Log Analytics for the retention period) ages out promptly.
         for r in self._query(
-            "AppRequests | where TimeGenerated > ago(24h) "
+            f"AppRequests | where TimeGenerated > ago({win}m) "
             "| where isnotempty(AppRoleName) | distinct AppRoleName",
-            window_minutes=60 * 24,
+            window_minutes=win,
         ):
             name = r.get("AppRoleName")
             if name:
@@ -137,9 +148,9 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
         # _query is resilient (returns [] if the table doesn't exist yet), so no
         # try/except is needed and no console_logs_unavailable warning is emitted.
         for r in self._query(
-            "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(24h) "
+            f"ContainerAppConsoleLogs_CL | where TimeGenerated > ago({win}m) "
             "| where isnotempty(ContainerAppName_s) | distinct ContainerAppName_s",
-            window_minutes=60 * 24,
+            window_minutes=win,
         ):
             name = r.get("ContainerAppName_s")
             if name:
@@ -177,10 +188,20 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
         total = float(row.get("TotalRequests") or 0)
         failures = float(row.get("Failures") or 0)
         p99 = float(row.get("P99Ms") or 0.0)
-        error_rate = (failures / total * 100.0) if total else 0.0
         last_exc = row.get("LastException")
         last_incident = str(last_exc) if last_exc else None
 
+        # No requests in the health window → the workload is not currently serving
+        # (idle or just deleted). Report UNKNOWN, never a fabricated "healthy 0/0".
+        # The `print` query always returns one row, so this — not the `if not rows`
+        # branch above — is what guards a no-telemetry service.
+        if total <= 0:
+            return ServiceHealth(
+                name=service, status=HealthStatus.UNKNOWN, responseTimeMs=0.0,
+                errorRatePct=0.0, lastIncident=last_incident, source="azure",
+            )
+
+        error_rate = failures / total * 100.0
         return ServiceHealth(
             name=service,
             status=self._classify(error_rate, p99),

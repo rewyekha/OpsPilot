@@ -139,8 +139,8 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
                   appearance="primary"
                   disabled={desc.trim().length < 10}
                   onClick={() => {
-                    // Mock: creates a client-side investigation (no backend call).
-                    createInvestigation({
+                    // Starts a REAL backend investigation (orchestrator over live telemetry).
+                    void createInvestigation({
                       description: desc.trim(),
                       affectedServices: services
                         .split(',')

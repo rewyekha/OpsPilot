@@ -6,6 +6,7 @@ import {
 } from '../../hooks/useIncident'
 import { useSession } from '../../store/SessionContext'
 import { IncidentStatusBadge } from '../shared/SeverityBadge'
+import { EmptyState } from '../shared/EmptyState'
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -523,16 +524,30 @@ export const IncidentPanel: React.FC = () => {
     )
   }
 
-  // ── Error state ─────────────────────────────────────────────────────────────
-  if (error || !data) {
+  // ── Error state (a real fetch failure) ──────────────────────────────────────
+  if (error) {
     return (
       <div className={s.page}>
         <div className={s.errorCard}>
           <div className={s.errorAccent} />
           <div className={s.errorContent}>
             <p className={s.errorTitle}>Failed to load incident</p>
-            <p className={s.errorMessage}>{error ?? 'No data available'}</p>
+            <p className={s.errorMessage}>{error}</p>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Empty state (no active incident — NOT an error) ─────────────────────────
+  if (!data) {
+    return (
+      <div className={s.page}>
+        <div className={s.card} style={{ padding: '22px 24px' }}>
+          <EmptyState
+            title="No active incidents detected"
+            body="All monitored services are healthy. An incident appears here when Azure telemetry reports an anomaly, or when you start an investigation from a service."
+          />
         </div>
       </div>
     )

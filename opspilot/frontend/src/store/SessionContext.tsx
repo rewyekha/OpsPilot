@@ -6,7 +6,8 @@
  * state that layers on top of it without touching the backend:
  *
  *   - actionJobs:      remediation execution jobs + their live status
- *   - timelineEvents:  synthetic timeline entries created by user actions
+ *   - timelineEvents:  operator-action breadcrumbs (e.g. "Investigation created"
+ *                      is emitted only after a REAL backend investigation starts)
  *   - incidents:       per-incident lifecycle records (status + timestamps + meta)
  *
  * Incident lifecycle: investigating → mitigating → monitoring → resolved → closed.
@@ -20,6 +21,7 @@
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { ApiRecommendedAction } from '../api/recommendations'
+import { incidentsApi } from '../api/incidents'
 import { useNotify } from './NotificationContext'
 import { LIFECYCLE_LABELS, type LifecycleKey } from '../theme/tokens'
 
@@ -99,7 +101,7 @@ interface SessionContextValue {
   createInvestigation: (input: {
     description: string
     affectedServices: string[]
-  }) => IncidentSessionRecord
+  }) => Promise<void>
   registerIncident: (id: string, meta: IncidentMeta) => void
   incidentStatus: (id: string) => IncidentLifecycle
   incidentRecord: (id: string) => IncidentSessionRecord | undefined
@@ -248,30 +250,38 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   )
 
   const createInvestigation = useCallback(
-    (input: { description: string; affectedServices: string[] }) => {
-      const id = nextId('INC')
-      const record: IncidentSessionRecord = {
-        ...blankRecord(id),
-        title: input.description.slice(0, 80),
-        startedAt: new Date().toISOString(),
+    async (input: { description: string; affectedServices: string[] }) => {
+      // REAL backend investigation — no client-side fabrication. The orchestrator
+      // runs over live telemetry; activity/records appear only because a real run
+      // happened. On failure we surface the error and create nothing.
+      try {
+        const created = await incidentsApi.create({
+          description: input.description,
+          affected_services: input.affectedServices,
+        })
+        const id = created.id
+        setIncidents((prev) => ({
+          ...prev,
+          [id]: { ...blankRecord(id), title: input.description.slice(0, 80), startedAt: created.created_at },
+        }))
+        appendEvent({
+          incidentId: id,
+          kind: 'investigation_created',
+          title: 'Investigation created',
+          description: input.description,
+          source: 'Operator',
+          confidence: 100,
+        })
+        notify({ title: 'Investigation started', body: `${id} · real agents dispatched`, intent: 'success' })
+      } catch (e) {
+        notify({
+          title: 'Could not start investigation',
+          body: e instanceof Error ? e.message : 'Backend unreachable.',
+          intent: 'error',
+        })
       }
-      setIncidents((prev) => ({ ...prev, [id]: record }))
-      appendEvent({
-        incidentId: id,
-        kind: 'investigation_created',
-        title: 'Investigation created',
-        description: input.description,
-        source: 'Operator',
-        confidence: 100,
-      })
-      notify({
-        title: 'Investigation created',
-        body: `${id} · agents dispatched`,
-        intent: 'success',
-      })
-      return record
     },
-    [nextId, appendEvent, notify],
+    [appendEvent, notify],
   )
 
   const registerIncident = useCallback((id: string, meta: IncidentMeta) => {

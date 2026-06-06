@@ -68,11 +68,8 @@ export function useActiveIncidentWithRecommendations(): FetchState<IncidentWithR
       .latest()
       .then((rec) => {
         if (cancelled) return
-        if (!rec) {
-          setState({ data: null, loading: false, error: 'No investigations yet' })
-        } else {
-          setState({ data: fromRecord(rec), loading: false, error: null })
-        }
+        // No record is the EMPTY state (no active incident), NOT an error.
+        setState({ data: rec ? fromRecord(rec) : null, loading: false, error: null })
       })
       .catch((err: unknown) => {
         if (!cancelled) setState({ data: null, loading: false, error: err instanceof Error ? err.message : 'Failed to load incident' })
