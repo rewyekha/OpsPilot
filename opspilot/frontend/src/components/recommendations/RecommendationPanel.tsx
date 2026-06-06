@@ -15,7 +15,7 @@
  * DetailDrawer) and the timezone-aware formatters so every timestamp follows
  * the global local/UTC toggle.
  */
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   makeStyles,
   tokens,
@@ -40,21 +40,21 @@ import {
   ArrowUndoRegular,
   WrenchRegular,
   ServerRegular,
-  CheckmarkCircleRegular,
-  LockClosedRegular,
+  OpenRegular,
 } from '@fluentui/react-icons'
-import { useRecommendations } from '../../hooks/useRecommendations'
-import { useAgentActivity } from '../../hooks/useAgentActivity'
-import { useActiveIncidentWithRecommendations } from '../../hooks/useIncident'
-import { useIncidentStream } from '../../hooks/useIncidentStream'
-import type { ApiAgentTask } from '../../api/agents'
+import { useLiveInvestigation } from '../../hooks/useLiveInvestigation'
+import { useLatestInvestigation } from '../../hooks/useInsights'
 import type { ApiRecommendedAction } from '../../api/recommendations'
+import type { StoredAction } from '../../api/insights'
+import { EmptyState } from '../shared/EmptyState'
 import { StreamStatusBadge } from '../shared/StreamStatusBadge'
 import { SeverityBadge, AgentStatusBadge, RiskBadge, IncidentStatusBadge } from '../shared/SeverityBadge'
 import { ConfidenceBar } from '../shared/ConfidenceBar'
-import { ConfirmDialog } from '../shared/ConfirmDialog'
-import { AgentDetailsDrawer } from '../agents/AgentDetailsDrawer'
+import { AgentBlade, type AgentLike } from '../agents/AgentBlade'
 import { MonitoredServices } from '../services/MonitoredServices'
+import { DashboardSummary } from '../dashboard/DashboardSummary'
+import { InvestigationBlade } from '../incident/InvestigationBlade'
+import { AnalyticsBlade } from '../analytics/AnalyticsBlade'
 import { RecommendationDrawer } from './RecommendationDrawer'
 import { ActionStatusBadge } from '../actions/ActionStatusBadge'
 import { useSession } from '../../store/SessionContext'
@@ -250,65 +250,47 @@ const Kpi: React.FC<KpiProps> = ({ label, children }) => {
 
 export const RecommendationPanel: React.FC = () => {
   const s = useStyles()
-  const recState = useRecommendations(ACTIVE_INCIDENT_ID)
-  const agentState = useAgentActivity(ACTIVE_INCIDENT_ID)
-  const incidentState = useActiveIncidentWithRecommendations()
-  const { status: streamStatus, lastEvent } = useIncidentStream(ACTIVE_INCIDENT_ID)
-  const { jobs, timelineEvents, incidentStatus, registerIncident, markResolved, closeIncident } =
-    useSession()
+  // Single source of truth — the latest persisted investigation. The incident
+  // summary, confidence, blast radius, cost and recommendations all come from a
+  // real completed run (or the empty state); nothing is seeded from static data.
+  const latest = useLatestInvestigation(ACTIVE_INCIDENT_ID)
+  // Live investigation queue — driven entirely by real SSE orchestrator events.
+  const live = useLiveInvestigation(ACTIVE_INCIDENT_ID)
+  const streamStatus = live.connection
+  const { jobs, timelineEvents, incidentStatus } = useSession()
   const fmt = useFormatters()
-  const [confirm, setConfirm] = useState<'resolved' | 'closed' | null>(null)
-
-  // Live confidence — seeded from HTTP, updated by SSE root_cause.updated
-  const [liveConfidence, setLiveConfidence] = useState<number | null>(null)
-  useEffect(() => {
-    if (lastEvent?.event_type === 'root_cause.updated') {
-      const c = lastEvent.payload.confidence
-      if (typeof c === 'number') setLiveConfidence(c)
-    }
-  }, [lastEvent])
+  const [investigationOpen, setInvestigationOpen] = useState(false)
+  const [analyticsOpen, setAnalyticsOpen] = useState(false)
 
   // Drawer selection state
-  const [selectedAgent, setSelectedAgent] = useState<ApiAgentTask | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AgentLike | null>(null)
   const [selectedRec, setSelectedRec] = useState<ApiRecommendedAction | null>(null)
 
-  const rootCause = recState.data?.root_cause
+  const record = latest.data
+  const hasRecord = !!record
+  const rootCause = record?.root_cause
+  const toAction = (r: StoredAction): ApiRecommendedAction => ({
+    incident_id: record?.incident_id ?? '',
+    id: r.id, priority: r.priority, type: r.type, type_label: r.type_label,
+    title: r.title, description: r.description, steps: r.steps ?? [],
+    risk: r.risk, risk_label: r.risk_label, impact: r.impact, impact_label: r.impact_label,
+    estimated_time: r.estimated_time,
+  })
   const actions = useMemo(
-    () => [...(recState.data?.actions ?? [])].sort((a, b) => a.priority - b.priority),
-    [recState.data],
+    () => [...(record?.recommendations ?? [])].sort((a, b) => a.priority - b.priority).map(toAction),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [record],
   )
-  const agents = agentState.data?.agents ?? []
-  const incident = incidentState.data?.incident
+  const agents = live.agents
 
-  const confidence = liveConfidence ?? rootCause?.confidence ?? 0
+  // Confidence: live (SSE) while running, else the real persisted value.
+  const confidence = live.confidence ?? record?.combined_confidence ?? 0
   const lifecycle = incidentStatus(ACTIVE_INCIDENT_ID)
-  const canResolve = lifecycle !== 'resolved' && lifecycle !== 'closed'
-  const canClose = lifecycle === 'resolved'
 
-  // Seed lifecycle record with display meta so History can show it once closed.
-  useEffect(() => {
-    if (!rootCause) return
-    registerIncident(ACTIVE_INCIDENT_ID, {
-      title: rootCause.title,
-      rootCause: rootCause.title,
-      impactUsd: rootCause.hourly_impact_usd,
-      blastRadius: rootCause.blast_radius,
-      startedAt: incident?.created_at ?? null,
-    })
-  }, [rootCause, incident, registerIncident])
-
-  if (recState.loading) {
+  if (latest.loading) {
     return (
       <div className={s.center}>
-        <Spinner label="Loading incident…" />
-      </div>
-    )
-  }
-
-  if (recState.error || !rootCause) {
-    return (
-      <div className={s.page}>
-        <div className={s.error}>{recState.error ?? 'No incident data available.'}</div>
+        <Spinner label="Loading investigation…" />
       </div>
     )
   }
@@ -319,60 +301,68 @@ export const RecommendationPanel: React.FC = () => {
       <div className={s.headerRow}>
         <span className={s.sectionLabel}>Incident Summary</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Lifecycle status is shown once, in the Status KPI below (Phase 8 UX:
-              removed the duplicate badge here — the KPI is the single source). */}
+          {/* One primary action per card — all investigation actions live inside
+              the blade modal (Azure Portal / Grafana interaction model). */}
           <Button
             size="small"
-            appearance="secondary"
-            icon={<CheckmarkCircleRegular />}
-            disabled={!canResolve}
-            onClick={() => setConfirm('resolved')}
+            appearance="primary"
+            icon={<OpenRegular />}
+            onClick={() => setInvestigationOpen(true)}
           >
-            Mark Resolved
-          </Button>
-          <Button
-            size="small"
-            appearance="secondary"
-            icon={<LockClosedRegular />}
-            disabled={!canClose}
-            onClick={() => setConfirm('closed')}
-          >
-            Close Incident
+            Open Investigation
           </Button>
           <StreamStatusBadge status={streamStatus} />
         </div>
       </div>
 
-      <div className={s.summary}>
-        <Kpi label="Incident">
-          <span className={mergeClasses(s.kpiValue, s.mono)}>{rootCause.incident_id}</span>
-        </Kpi>
-        <Kpi label="Severity">
-          <span>
-            <SeverityBadge severity={incident?.severity ?? 'P1'} pill />
-          </span>
-        </Kpi>
-        <Kpi label="Status">
-          <span>
-            <IncidentStatusBadge status={lifecycle} />
-          </span>
-        </Kpi>
-        <Kpi label="Confidence">
-          <span className={s.kpiValue} style={{ color: confidenceColor(confidence) }}>
-            {Math.round(confidence)}%
-          </span>
-        </Kpi>
-        <Kpi label="Blast Radius">
-          <span className={s.kpiValue}>
-            {rootCause.blast_radius} svc · {formatCompactNumber(rootCause.affected_users)} users
-          </span>
-        </Kpi>
-        <Kpi label="Cost Impact">
-          <span className={s.kpiValue} style={{ color: '#f87171' }}>
-            {formatCurrency(rootCause.hourly_impact_usd)}/hr
-          </span>
-        </Kpi>
+      {hasRecord && record && rootCause ? (
+        <div className={s.summary}>
+          <Kpi label="Incident">
+            <span className={mergeClasses(s.kpiValue, s.mono)}>{record.incident_id}</span>
+          </Kpi>
+          <Kpi label="Severity">
+            <span>{record.severity ? <SeverityBadge severity={record.severity} pill /> : <span className={s.kpiValue}>—</span>}</span>
+          </Kpi>
+          <Kpi label="Status">
+            <span>
+              <IncidentStatusBadge status={lifecycle} />
+            </span>
+          </Kpi>
+          <Kpi label="Confidence">
+            <span className={s.kpiValue} style={{ color: confidenceColor(confidence) }}>
+              {Math.round(confidence)}%
+            </span>
+          </Kpi>
+          <Kpi label="Blast Radius">
+            <span className={s.kpiValue}>
+              {rootCause.blast_radius} svc · {formatCompactNumber(rootCause.affected_users)} users
+            </span>
+          </Kpi>
+          <Kpi label="Cost Impact">
+            <span className={s.kpiValue} style={{ color: '#f87171' }}>
+              {formatCurrency(rootCause.hourly_impact_usd)}/hr
+            </span>
+          </Kpi>
+        </div>
+      ) : (
+        <div className={s.card}>
+          <EmptyState
+            title="No investigations yet"
+            body="Run an investigation to populate the incident summary, confidence, blast radius and recommendations — all from real agent execution."
+            actionLabel="Open Investigation"
+            onAction={() => setInvestigationOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* ── Investigation overview ─────────────────────────────────────────── */}
+      <div className={s.headerRow}>
+        <span className={s.sectionLabel}>Overview</span>
+        <Button size="small" appearance="primary" icon={<OpenRegular />} onClick={() => setAnalyticsOpen(true)}>
+          Open Analytics
+        </Button>
       </div>
+      <DashboardSummary />
 
       {/* ── Monitored services ─────────────────────────────────────────────── */}
       <MonitoredServices />
@@ -393,15 +383,25 @@ export const RecommendationPanel: React.FC = () => {
           <TableBody>
             {agents.map((a) => {
               const Icon = AGENT_ICON[a.role] ?? BotRegular
+              const badgeStatus = a.status === 'complete' ? 'completed' : a.status
+              const openAgent = () =>
+                setSelectedAgent({
+                  role: a.role,
+                  role_label: a.label,
+                  status: badgeStatus,
+                  confidence: a.confidence,
+                  duration_seconds: a.durationMs / 1000,
+                  finding: a.finding,
+                  evidence: [],
+                  incident_id: ACTIVE_INCIDENT_ID,
+                })
               return (
                 <TableRow
-                  key={a.id}
+                  key={a.role}
                   className={s.row}
-                  onClick={() => setSelectedAgent(a)}
+                  onClick={openAgent}
                   tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') setSelectedAgent(a)
-                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openAgent() }}
                 >
                   <TableCell>
                     <TableCellLayout>
@@ -410,37 +410,32 @@ export const RecommendationPanel: React.FC = () => {
                           <Icon />
                         </span>
                         <div>
-                          <div className={s.agentName}>{a.role_label}</div>
+                          <div className={s.agentName}>{a.label}</div>
                           <div className={s.agentRole}>{a.role}</div>
                         </div>
                       </div>
                     </TableCellLayout>
                   </TableCell>
                   <TableCell>
-                    <AgentStatusBadge status={a.status} />
+                    <AgentStatusBadge status={badgeStatus} />
                   </TableCell>
                   <TableCell className={s.confCell}>
                     <ConfidenceBar value={a.confidence} animate={false} />
                   </TableCell>
-                  <TableCell className={s.durCell}>{formatDuration(a.duration_seconds)}</TableCell>
+                  <TableCell className={s.durCell}>{a.durationMs ? formatDuration(a.durationMs / 1000) : '—'}</TableCell>
                   <TableCell>
                     <ChevronRightRegular className={s.chevron} />
                   </TableCell>
                 </TableRow>
               )
             })}
-            {agents.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} style={{ color: tokens.colorNeutralForeground3 }}>
-                  {agentState.loading ? 'Loading agents…' : 'No agents dispatched yet.'}
-                </TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* ── Recommended actions ────────────────────────────────────────────── */}
+      {/* ── Recommended actions (from the persisted investigation) ─────────── */}
+      {actions.length > 0 && (
+      <>
       <span className={s.sectionLabel}>Recommended Actions</span>
       <div className={s.tiles}>
         {actions.map((action) => {
@@ -471,6 +466,8 @@ export const RecommendationPanel: React.FC = () => {
           )
         })}
       </div>
+      </>
+      )}
 
       {/* ── Live activity (session events: executions, investigations) ──────── */}
       {timelineEvents.length > 0 && (
@@ -501,9 +498,9 @@ export const RecommendationPanel: React.FC = () => {
         </>
       )}
 
-      {/* ── Drawers ────────────────────────────────────────────────────────── */}
-      <AgentDetailsDrawer
-        task={selectedAgent}
+      {/* ── Drawers / blades ───────────────────────────────────────────────── */}
+      <AgentBlade
+        agent={selectedAgent}
         open={selectedAgent !== null}
         onClose={() => setSelectedAgent(null)}
       />
@@ -513,29 +510,12 @@ export const RecommendationPanel: React.FC = () => {
         onClose={() => setSelectedRec(null)}
       />
 
-      {/* ── Lifecycle confirmations ─────────────────────────────────────────── */}
-      <ConfirmDialog
-        open={confirm === 'resolved'}
-        title="Mark incident as Resolved?"
-        message="Confirm the incident is mitigated and recovery is verified. This records a Resolved state transition on the timeline."
-        confirmLabel="Mark Resolved"
-        onCancel={() => setConfirm(null)}
-        onConfirm={() => {
-          markResolved(ACTIVE_INCIDENT_ID)
-          setConfirm(null)
-        }}
-      />
-      <ConfirmDialog
-        open={confirm === 'closed'}
-        title="Close this incident?"
-        message="Closing moves the incident to History as a closed record. This cannot be undone in the current session."
-        confirmLabel="Close Incident"
-        tone="danger"
-        onCancel={() => setConfirm(null)}
-        onConfirm={() => {
-          closeIncident(ACTIVE_INCIDENT_ID)
-          setConfirm(null)
-        }}
+      {/* ── Blades (entity actions live inside these modals) ────────────────── */}
+      <InvestigationBlade open={investigationOpen} onClose={() => setInvestigationOpen(false)} />
+      <AnalyticsBlade
+        open={analyticsOpen}
+        onClose={() => setAnalyticsOpen(false)}
+        onOpenFull={() => window.dispatchEvent(new CustomEvent('opspilot:navigate', { detail: { page: 'analytics' } }))}
       />
     </div>
   )

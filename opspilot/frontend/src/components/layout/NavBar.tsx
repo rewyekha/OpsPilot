@@ -36,13 +36,8 @@ interface Notification {
   read: boolean
 }
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  { id: 'n1', timestamp: '2 min ago',  severity: 'critical', read: false, message: 'Checkout service P1 incident detected – ORM connection pool exhausted in deployment v2.4.1.' },
-  { id: 'n2', timestamp: '8 min ago',  severity: 'warning',  read: false, message: 'Deployment agent flagged v2.4.1 rollout as high-risk based on historical failure patterns.' },
-  { id: 'n3', timestamp: '12 min ago', severity: 'info',     read: true,  message: '5 autonomous agents dispatched for INC-2024-0847 root cause investigation.' },
-  { id: 'n4', timestamp: '15 min ago', severity: 'success',  read: false, message: 'Root cause confirmed with 94% confidence – ORM regression isolated to deployment v2.4.1.' },
-  { id: 'n5', timestamp: '18 min ago', severity: 'info',     read: true,  message: 'Business impact estimated at $50,400/hr – escalation team notified via PagerDuty.' },
-]
+// No seeded notifications — the running app never shows hardcoded incident data.
+const INITIAL_NOTIFICATIONS: Notification[] = []
 
 const SEV_CFG: Record<Severity, { label: string; bg: string; border: string; text: string }> = {
   critical: { label: 'CRITICAL', bg: 'rgba(220, 38, 38, 0.12)',  border: 'rgba(220, 38, 38, 0.35)', text: '#f87171' },

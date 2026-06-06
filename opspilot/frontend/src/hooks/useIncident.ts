@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { incidentApi, type ApiIncidentRecord } from '../api/incidents'
-import { recommendationApi, type ApiRecommendationResponse } from '../api/recommendations'
+import type { ApiIncidentRecord } from '../api/incidents'
+import type { ApiRecommendationResponse } from '../api/recommendations'
+import { insightsApi, type InvestigationRecord } from '../api/insights'
+import { ACTIVE_INCIDENT_ID } from '../utils/constants'
 
 export interface IncidentWithRec {
   incident: ApiIncidentRecord
@@ -13,54 +15,71 @@ export interface FetchState<T> {
   error: string | null
 }
 
+/** Build the incident + recommendations view entirely from a persisted, real
+ *  investigation record — no static incident/recommendation seeds. */
+function fromRecord(rec: InvestigationRecord): IncidentWithRec {
+  const incident: ApiIncidentRecord = {
+    id: rec.incident_id,
+    description: rec.description,
+    status: 'investigating',
+    severity: rec.severity || 'P2',
+    affected_services: [],
+    reporter: 'orchestrator',
+    created_at: rec.started_at,
+    updated_at: rec.completed_at,
+    resolved_at: null,
+    langgraph_run_id: rec.id,
+    error_rate_pct: null,
+  }
+  const recommendations: ApiRecommendationResponse = {
+    incident_id: rec.incident_id,
+    root_cause: {
+      incident_id: rec.incident_id,
+      title: rec.root_cause.title,
+      description: rec.root_cause.description,
+      confidence: rec.root_cause.confidence,
+      blast_radius: rec.root_cause.blast_radius,
+      affected_users: rec.root_cause.affected_users,
+      hourly_impact_usd: rec.root_cause.hourly_impact_usd,
+      evidence: rec.root_cause.evidence,
+    },
+    actions: rec.recommendations.map((a) => ({ ...a, incident_id: rec.incident_id })),
+  }
+  return { incident, recommendations }
+}
+
+/**
+ * Latest real investigation for the active incident, adapted to the incident +
+ * recommendations shape. Returns null (→ empty state) until an investigation has
+ * run. Re-fetches on `opspilot:refresh`.
+ */
 export function useActiveIncidentWithRecommendations(): FetchState<IncidentWithRec> {
-  const [state, setState] = useState<FetchState<IncidentWithRec>>({
-    data: null,
-    loading: true,
-    error: null,
-  })
+  const [state, setState] = useState<FetchState<IncidentWithRec>>({ data: null, loading: true, error: null })
+  const [nonce, setNonce] = useState(0)
+
+  useEffect(() => {
+    const bump = () => setNonce((n) => n + 1)
+    window.addEventListener('opspilot:refresh', bump)
+    return () => window.removeEventListener('opspilot:refresh', bump)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-
-    async function load() {
-      try {
-        const incidents = await incidentApi.getActive()
+    insightsApi
+      .latest(ACTIVE_INCIDENT_ID)
+      .then((rec) => {
         if (cancelled) return
-
-        if (incidents.length === 0) {
-          setState({ data: null, loading: false, error: 'No active incidents found' })
-          return
+        if (!rec) {
+          setState({ data: null, loading: false, error: 'No investigations yet' })
+        } else {
+          setState({ data: fromRecord(rec), loading: false, error: null })
         }
-
-        const incident = incidents[0]
-        let recommendations: ApiRecommendationResponse | null = null
-
-        try {
-          recommendations = await recommendationApi.get(incident.id)
-        } catch {
-          // recommendations may not be available yet; non-fatal
-        }
-
-        if (!cancelled) {
-          setState({ data: { incident, recommendations }, loading: false, error: null })
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setState({
-            data: null,
-            loading: false,
-            error: err instanceof Error ? err.message : 'Failed to load incident',
-          })
-        }
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setState({ data: null, loading: false, error: err instanceof Error ? err.message : 'Failed to load incident' })
+      })
+    return () => { cancelled = true }
+  }, [nonce])
 
   return state
 }

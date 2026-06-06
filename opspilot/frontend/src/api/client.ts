@@ -21,3 +21,18 @@ export async function apiFetch<T>(path: string): Promise<T> {
   }
   return res.json() as Promise<T>
 }
+
+export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    const msg: string =
+      err && typeof err.detail === 'string' ? err.detail : res.statusText
+    throw new ApiError(res.status, msg)
+  }
+  return res.json() as Promise<T>
+}

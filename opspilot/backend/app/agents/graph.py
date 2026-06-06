@@ -82,6 +82,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
     # ── Specialist nodes ─────────────────────────────────────────────────────
     async def metrics_node(state: OpsPilotState) -> dict:
         f = await orch.metrics.run(state)
+        orch._collect("metrics", "Metrics", f)
         return {
             "metrics_findings": f.metadata,
             "finding_confidences": _merge_confidence(state, "metrics", f.confidence),
@@ -89,6 +90,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
 
     async def logs_node(state: OpsPilotState) -> dict:
         f = await orch.logs.run(state)
+        orch._collect("logs", "Logs", f)
         return {
             "logs_findings": f.metadata,
             "finding_confidences": _merge_confidence(state, "logs", f.confidence),
@@ -96,6 +98,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
 
     async def deployment_node(state: OpsPilotState) -> dict:
         f = await orch.deployment.run(state)
+        orch._collect("deployment", "Deployment", f)
         return {
             "deployment_findings": f.metadata,
             "finding_confidences": _merge_confidence(state, "deployment", f.confidence),
@@ -103,6 +106,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
 
     async def time_machine_node(state: OpsPilotState) -> dict:
         f = await orch.correlation.run(state)
+        orch._collect("time_machine", "Time Machine", f)
         return {
             "timeline": f.metadata.get("timeline", []),
             "finding_confidences": _merge_confidence(state, "time_machine", f.confidence),
@@ -110,6 +114,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
 
     async def root_cause_node(state: OpsPilotState) -> dict:
         f = await orch.root_cause.run(state)
+        orch._collect("root_cause", "Root Cause", f)
         return {
             "root_cause_findings": _root_cause_state(f),
             "root_cause_source": "root_cause",
@@ -159,6 +164,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
     # ── Deep reasoning (o4-mini) — refines the root cause on escalation ──────
     async def deep_reasoning_node(state: OpsPilotState) -> dict:
         f = await orch.reasoning.run(state)
+        orch._collect("reasoning", "Deep Reasoning", f)
         return {
             "root_cause_findings": _root_cause_state(f),
             "root_cause_source": "reasoning",
@@ -187,7 +193,10 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
                 },
             },
         )
-        await orch.recommendation.run(state)
+        rec_finding = await orch.recommendation.run(state)
+        orch._collect("recommendation", "Recommendation", rec_finding)
+        # Capture the generated remediation actions for persistence (Task 6).
+        orch._recommendations = list((rec_finding.metadata or {}).get("actions", []) or [])
         return {}
 
     sg.add_node("metrics_agent", metrics_node)

@@ -106,6 +106,7 @@ interface SessionContextValue {
   incidentRecord: (id: string) => IncidentSessionRecord | undefined
   markResolved: (id: string) => void
   closeIncident: (id: string) => void
+  reopenIncident: (id: string) => void
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null)
@@ -304,6 +305,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const markResolved = useCallback((id: string) => transition(id, 'resolved'), [transition])
   const closeIncident = useCallback((id: string) => transition(id, 'closed'), [transition])
+  // Re-open a closed/resolved incident back into an actionable investigating state.
+  const reopenIncident = useCallback((id: string) => transition(id, 'investigating'), [transition])
 
   const closedIncidents = useMemo(
     () => Object.values(incidents).filter((r) => r.status === 'closed'),
@@ -323,6 +326,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       incidentRecord,
       markResolved,
       closeIncident,
+      reopenIncident,
     }),
     [
       jobs,
@@ -336,6 +340,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       incidentRecord,
       markResolved,
       closeIncident,
+      reopenIncident,
     ],
   )
 

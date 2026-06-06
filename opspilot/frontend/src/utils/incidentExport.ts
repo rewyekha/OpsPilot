@@ -140,6 +140,28 @@ export function snapshotToMarkdown(input: SnapshotInput): string {
   return L.join('\n')
 }
 
+/** A concise executive summary paragraph (for copy / quick share). */
+export function executiveSummary(input: SnapshotInput): string {
+  const { incident, rootCause, actions = [], agents = [] } = input
+  const parts: string[] = []
+  parts.push(`Incident ${input.incidentId}${input.status ? ` (${input.status})` : ''}.`)
+  if (incident) parts.push(`Severity ${incident.severity}.`)
+  if (rootCause) {
+    parts.push(
+      `Root cause: ${rootCause.title} — ${rootCause.description} ` +
+        `Confidence ${Math.round(rootCause.confidence)}%, blast radius ${rootCause.blast_radius} service(s), ` +
+        `~${rootCause.affected_users.toLocaleString()} users, ` +
+        `$${Math.round(rootCause.hourly_impact_usd).toLocaleString()}/hr impact.`,
+    )
+  }
+  if (agents.length) parts.push(`${agents.length} agents engaged.`)
+  if (actions.length) {
+    const top = [...actions].sort((a, b) => a.priority - b.priority)[0]
+    parts.push(`Recommended action: ${top.title} (${top.type_label}, ${top.risk_label}).`)
+  }
+  return parts.join(' ')
+}
+
 /** Trigger a browser download of in-memory content. */
 export function downloadBlob(filename: string, content: string, mime: string): void {
   const blob = new Blob([content], { type: mime })

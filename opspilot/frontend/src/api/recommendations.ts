@@ -1,5 +1,3 @@
-import { apiFetch } from './client'
-
 export interface ApiRootCause {
   incident_id: string
   title: string
@@ -31,11 +29,4 @@ export interface ApiRecommendationResponse {
   incident_id: string
   root_cause: ApiRootCause
   actions: ApiRecommendedAction[]
-}
-
-export const recommendationApi = {
-  get: (incidentId: string): Promise<ApiRecommendationResponse> =>
-    apiFetch<ApiRecommendationResponse>(
-      `/api/recommendations/${encodeURIComponent(incidentId)}`,
-    ),
 }

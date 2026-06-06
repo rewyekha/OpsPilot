@@ -41,10 +41,11 @@ def test_default_mode_is_mock(monkeypatch):
     assert provider_is_live() is False
 
 
-def test_mock_provider_routes_reasoning_to_o4_mini():
+def test_mock_provider_routes_all_roles_to_o4_mini():
+    # Cost control: every role defaults to o4-mini (no gpt-4o / gpt-4o-mini).
     provider = MockProvider()
-    assert provider.model_for(ModelRole.COMMANDER) == "gpt-4o"
-    assert provider.model_for(ModelRole.SPECIALIST) == "gpt-4o-mini"
+    assert provider.model_for(ModelRole.COMMANDER) == "o4-mini"
+    assert provider.model_for(ModelRole.SPECIALIST) == "o4-mini"
     assert provider.model_for(ModelRole.REASONING) == "o4-mini"
 
 

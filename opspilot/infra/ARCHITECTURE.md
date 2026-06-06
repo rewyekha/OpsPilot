@@ -109,14 +109,19 @@ the zero-credential default for local dev, CI, and the offline demo.
 1. `az group create` → resource group.
 2. Log Analytics workspace (`opspilot-logs`).
 3. Workspace-based Application Insights (`opspilot-appinsights`).
-4. Container Apps Environment (`opspilot-aca-env`) wired to the workspace.
-5. `deploy-album-api.ps1` and `deploy-voting-app.ps1` (build + deploy workloads,
-   inject App Insights connection string).
+4. Container Apps Environment + Managed Identity + Key Vault.
+5. `scripts/deploy-album-api.ps1` and `scripts/deploy-voting-app.ps1` (build +
+   deploy workloads, inject the App Insights connection string).
 6. Configure OpsPilot backend `.env`:
    `TELEMETRY_MODE=azure`, `AZURE_LOG_ANALYTICS_WORKSPACE_ID`,
    `APPLICATIONINSIGHTS_CONNECTION_STRING`, plus the existing
    `EXECUTION_MODE=foundry` Foundry settings.
 
-Steps 1–4 are performed automatically (idempotently) by the deploy scripts; the
-existing Bicep under [`bicep/`](./bicep) provisions the OpsPilot platform itself
-(Cosmos, AI Search, Key Vault, Foundry).
+Steps 1–4 are provisioned by `bicep/main.bicep` via
+[`scripts/deploy-core-infra.ps1`](./scripts/deploy-core-infra.ps1). The refactored
+Bicep provisions **only** the core OpsPilot infrastructure — Log Analytics,
+Application Insights, Managed Identity, Key Vault, Container Apps Environment, and
+an optional Container Registry. **Azure AI Foundry is an external dependency and
+is never provisioned** (only validated); there is no Cosmos DB / AI Search / Redis
+(the file-based investigation store is the source of truth). See
+[`DEPLOYMENT_RUNBOOK.md`](./DEPLOYMENT_RUNBOOK.md) and [`COST_ESTIMATE.md`](./COST_ESTIMATE.md).

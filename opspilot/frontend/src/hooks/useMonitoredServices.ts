@@ -3,7 +3,7 @@ import {
   servicesApi,
   type ApiMonitoredServicesResponse,
 } from '../api/services'
-import type { FetchState } from './useRecommendations'
+import type { FetchState } from './fetchState'
 
 /**
  * Loads the 'Monitored Services' health roster from GET /api/system/services.

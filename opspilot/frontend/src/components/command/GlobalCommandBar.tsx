@@ -42,11 +42,9 @@ import { IncidentStatusBadge } from '../shared/SeverityBadge'
 import { usePreferences } from '../../store/PreferencesContext'
 import { useSession } from '../../store/SessionContext'
 import { useNotify } from '../../store/NotificationContext'
-import { useRecommendations } from '../../hooks/useRecommendations'
-import { useAgentActivity } from '../../hooks/useAgentActivity'
-import { useActiveIncidentWithRecommendations } from '../../hooks/useIncident'
+import { useActiveSnapshot } from '../../hooks/useActiveSnapshot'
 import { ACTIVE_INCIDENT_ID } from '../../utils/constants'
-import { buildSnapshot, downloadBlob, type SnapshotInput } from '../../utils/incidentExport'
+import { buildSnapshot, downloadBlob } from '../../utils/incidentExport'
 import { ReportDrawer } from '../report/ReportDrawer'
 
 const useStyles = makeStyles({
@@ -75,31 +73,17 @@ export interface GlobalCommandBarProps {
 export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, onRefresh }) => {
   const s = useStyles()
   const { timeZoneMode, toggleTimeZoneMode } = usePreferences()
-  const { createInvestigation, timelineEvents, jobs, incidentStatus } = useSession()
+  const { createInvestigation, incidentStatus } = useSession()
   const notify = useNotify()
-  const recState = useRecommendations(ACTIVE_INCIDENT_ID)
-  const agentState = useAgentActivity(ACTIVE_INCIDENT_ID)
-  const incidentState = useActiveIncidentWithRecommendations()
+  const { ready, buildInput } = useActiveSnapshot()
   const [newOpen, setNewOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [desc, setDesc] = useState('')
   const [services, setServices] = useState('')
 
-  const buildInput = (): SnapshotInput => ({
-    incidentId: ACTIVE_INCIDENT_ID,
-    status: incidentStatus(ACTIVE_INCIDENT_ID),
-    incident: incidentState.data?.incident ?? null,
-    rootCause: recState.data?.root_cause ?? null,
-    actions: recState.data?.actions ?? [],
-    agents: agentState.data?.agents ?? [],
-    jobs: Object.values(jobs),
-    sessionEvents: timelineEvents,
-    generatedAt: new Date().toISOString(),
-  })
-
   const handleExport = () => {
-    if (!recState.data && !incidentState.data) {
-      notify({ title: 'Nothing to export', body: 'Incident data has not loaded yet.', intent: 'warning' })
+    if (!ready) {
+      notify({ title: 'Nothing to export', body: 'No completed investigation yet.', intent: 'warning' })
       return
     }
     const snapshot = buildSnapshot(buildInput())
@@ -108,8 +92,8 @@ export const GlobalCommandBar: React.FC<GlobalCommandBarProps> = ({ onNavigate, 
   }
 
   const handleReport = () => {
-    if (!recState.data && !incidentState.data) {
-      notify({ title: 'Cannot generate report', body: 'Incident data has not loaded yet.', intent: 'warning' })
+    if (!ready) {
+      notify({ title: 'Cannot generate report', body: 'No completed investigation yet.', intent: 'warning' })
       return
     }
     setReportOpen(true)

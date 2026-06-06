@@ -1,4 +1,9 @@
-"""Mock recommendation service — returns deterministic data matching the frontend fixtures."""
+"""Recommendation service — derives from the persisted investigation store.
+
+Returns the latest completed investigation's REAL root cause + generated
+recommendations for an incident (or None if no investigation has run). No static
+data — the dashboard / incident page / report all read real execution output.
+"""
 from __future__ import annotations
 
 from app.models.recommendations import (
@@ -8,109 +13,58 @@ from app.models.recommendations import (
     RiskLevel,
     RootCause,
 )
+from app.services import investigation_store
 
-_RECOMMENDATIONS: dict[str, RecommendationResponse] = {
-    "INC-2024-0847": RecommendationResponse(
-        incident_id="INC-2024-0847",
-        root_cause=RootCause(
-            incident_id="INC-2024-0847",
-            title="ORM Connection Pool Regression in v2.4.1",
-            description=(
-                "Deployment v2.4.1 inadvertently reduced the SqlAlchemy connection pool size "
-                "from 20 to 5 via an automated dependency update (commit a3f9c12). Under normal "
-                "peak traffic, checkout-service requires up to 18 concurrent DB connections. "
-                "With pool_size=5, requests queue until timeout, causing a cascading error rate "
-                "spike that propagated to payment-gateway and cart-service."
-            ),
-            confidence=94.0,
-            blast_radius=3,
-            affected_users=12000,
-            hourly_impact_usd=50400.0,
-            evidence=[
-                "v2.4.1 SQLALCHEMY_POOL_SIZE: 5 (v2.4.0: 20) — commit a3f9c12",
-                "Error onset at 14:23 UTC, exactly 4 minutes after v2.4.1 deploy",
-                "INC-2023-0412 resolved identically — 96% pattern match",
-                "2,847 connection pool timeout errors in Log Analytics",
-                "73% error rate correlates with pool exhaustion under peak load",
-            ],
-        ),
-        actions=[
-            RecommendedAction(
-                id="action-847-1",
-                incident_id="INC-2024-0847",
-                priority=1,
-                type="rollback",
-                type_label="Rollback",
-                title="Roll Back to v2.4.0 (Immediate Mitigation)",
-                description=(
-                    "Revert checkout-service to v2.4.0, which uses the correct pool_size=20 "
-                    "configuration. This is the fastest path to service restoration and "
-                    "carries minimal risk given v2.4.0 was stable for 14 days."
-                ),
-                steps=[
-                    "Trigger rollback pipeline for checkout-service to tag v2.4.0",
-                    "Monitor error rate — should drop below 1% within 2 minutes of deploy",
-                    "Verify payment-gateway and cart-service recover automatically",
-                    "Confirm DB connection pool metrics return to baseline",
-                ],
-                risk=RiskLevel.SAFE,
-                risk_label="Safe",
-                impact=ImpactLevel.HIGH,
-                impact_label="High Impact",
-                estimated_time="~5 min",
-            ),
-            RecommendedAction(
-                id="action-847-2",
-                incident_id="INC-2024-0847",
-                priority=2,
-                type="fix",
-                type_label="Hotfix",
-                title="Apply Hotfix: Restore pool_size=20 in v2.4.1",
-                description=(
-                    "Patch the ORM configuration in v2.4.1 to restore pool_size=20 and "
-                    "deploy as v2.4.2. Enables v2.4.1 features while eliminating the "
-                    "regression. Requires code review and regression test pass."
-                ),
-                steps=[
-                    "Create branch hotfix/inc-2024-0847 from v2.4.1",
-                    "Set SQLALCHEMY_POOL_SIZE = 20 in app/config/database.py",
-                    "Run integration test suite (focus: DB connection pool under load)",
-                    "Deploy v2.4.2 via standard pipeline with canary rollout",
-                ],
-                risk=RiskLevel.MEDIUM,
-                risk_label="Medium Risk",
-                impact=ImpactLevel.HIGH,
-                impact_label="High Impact",
-                estimated_time="~15 min",
-            ),
-            RecommendedAction(
-                id="action-847-3",
-                incident_id="INC-2024-0847",
-                priority=3,
-                type="infrastructure",
-                type_label="Infrastructure",
-                title="Scale Checkout Service Horizontally",
-                description=(
-                    "Deploy 4 additional checkout-service replicas to distribute connection "
-                    "pool pressure across more instances. Buys time while rollback or hotfix "
-                    "is prepared. Does not fix root cause but reduces blast radius."
-                ),
-                steps=[
-                    "Scale checkout-service deployment from 3 to 7 replicas via kubectl",
-                    "Confirm HPA metrics stabilise within 3 minutes",
-                    "Monitor per-replica connection pool utilisation in Grafana",
-                    "Maintain scaled state until root cause fix is deployed",
-                ],
-                risk=RiskLevel.MEDIUM,
-                risk_label="Medium Risk",
-                impact=ImpactLevel.LOW,
-                impact_label="Low Impact",
-                estimated_time="~30 min",
-            ),
-        ],
-    )
-}
+
+def _risk(value: str) -> RiskLevel:
+    try:
+        return RiskLevel(value)
+    except ValueError:
+        return RiskLevel.MEDIUM
+
+
+def _impact(value: str) -> ImpactLevel:
+    try:
+        return ImpactLevel(value)
+    except ValueError:
+        return ImpactLevel.MEDIUM
 
 
 async def get_recommendations(incident_id: str) -> RecommendationResponse | None:
-    return _RECOMMENDATIONS.get(incident_id)
+    record = investigation_store.latest(incident_id)
+    if record is None or not (record.root_cause or {}).get("title"):
+        return None
+
+    rc = record.root_cause
+    root = RootCause(
+        incident_id=incident_id,
+        title=rc.get("title", ""),
+        description=rc.get("description", ""),
+        confidence=float(rc.get("confidence", 0.0) or 0.0),
+        blast_radius=int(rc.get("blast_radius", 0) or 0),
+        affected_users=int(rc.get("affected_users", 0) or 0),
+        hourly_impact_usd=float(rc.get("hourly_impact_usd", 0.0) or 0.0),
+        evidence=list(rc.get("evidence", []) or []),
+    )
+
+    actions: list[RecommendedAction] = []
+    for a in record.recommendations:
+        actions.append(
+            RecommendedAction(
+                id=str(a.get("id", "")),
+                incident_id=incident_id,
+                priority=int(a.get("priority", 1) or 1),
+                type=str(a.get("type", "")),
+                type_label=str(a.get("type_label", "")),
+                title=str(a.get("title", "")),
+                description=str(a.get("description", "")),
+                steps=list(a.get("steps", []) or []),
+                risk=_risk(str(a.get("risk", "medium"))),
+                risk_label=str(a.get("risk_label", "")),
+                impact=_impact(str(a.get("impact", "medium"))),
+                impact_label=str(a.get("impact_label", "")),
+                estimated_time=str(a.get("estimated_time", "")),
+            )
+        )
+
+    return RecommendationResponse(incident_id=incident_id, root_cause=root, actions=actions)

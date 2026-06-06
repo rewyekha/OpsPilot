@@ -12,11 +12,13 @@
  * Application Insights / Log Analytics when TELEMETRY_MODE=azure. A small chip
  * surfaces which source produced the numbers.
  */
-import React from 'react'
+import React, { useState } from 'react'
 import { makeStyles, tokens, mergeClasses, Spinner } from '@fluentui/react-components'
-import { ServerRegular } from '@fluentui/react-icons'
+import { ServerRegular, ServerMultipleRegular, OpenRegular } from '@fluentui/react-icons'
 import { useMonitoredServices } from '../../hooks/useMonitoredServices'
 import { useFormatters } from '../../store/PreferencesContext'
+import { EmptyState } from '../shared/EmptyState'
+import { ServiceBlade } from './ServiceBlade'
 import {
   HEALTH_COLORS,
   HEALTH_LABELS,
@@ -63,6 +65,15 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '12px',
     overflow: 'hidden',
+    cursor: 'pointer',
+    textAlign: 'left',
+    transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
+    ':hover': {
+      transform: 'translateY(-2px)',
+      border: `1px solid ${tokens.colorNeutralStroke2}`,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
+    },
+    ':focus-visible': { outline: `2px solid ${tokens.colorBrandStroke1}`, outlineOffset: '2px' },
   },
   rail: {
     position: 'absolute',
@@ -89,6 +100,18 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    flex: 1,
+  },
+  openHint: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '3px',
+    flexShrink: 0,
+    fontSize: '10px',
+    fontWeight: 700,
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    color: tokens.colorBrandForeground1,
   },
   metrics: {
     display: 'flex',
@@ -154,20 +177,28 @@ const HealthChip: React.FC<{ status: HealthKey }> = ({ status }) => {
   )
 }
 
-const ServiceTile: React.FC<{ svc: ApiServiceHealth }> = ({ svc }) => {
+const ServiceTile: React.FC<{ svc: ApiServiceHealth; onOpen: () => void }> = ({ svc, onOpen }) => {
   const s = useStyles()
   const fmt = useFormatters()
   const health = asHealth(svc.status)
   const cfg = HEALTH_COLORS[health]
 
   return (
-    <div className={s.tile}>
+    <div
+      className={s.tile}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      aria-label={`Open ${svc.name}`}
+    >
       <span className={s.rail} style={{ backgroundColor: cfg.color }} />
       <div className={s.tileHead}>
         <span className={s.icon}>
           <ServerRegular />
         </span>
         <span className={s.name}>{svc.name}</span>
+        <span className={s.openHint}>Open <OpenRegular fontSize={12} /></span>
       </div>
 
       <HealthChip status={health} />
@@ -195,6 +226,7 @@ const ServiceTile: React.FC<{ svc: ApiServiceHealth }> = ({ svc }) => {
 export const MonitoredServices: React.FC = () => {
   const s = useStyles()
   const { data, loading, error } = useMonitoredServices()
+  const [selected, setSelected] = useState<ApiServiceHealth | null>(null)
 
   return (
     <>
@@ -206,16 +238,25 @@ export const MonitoredServices: React.FC = () => {
       {loading && <Spinner size="tiny" label="Loading services…" />}
       {error && <div className={mergeClasses(s.empty)}>Unable to load services: {error}</div>}
       {!loading && !error && data && data.services.length === 0 && (
-        <div className={s.empty}>No monitored Azure services discovered</div>
+        <EmptyState
+          icon={<ServerMultipleRegular />}
+          title={`Telemetry Mode: ${data.telemetryMode.charAt(0).toUpperCase()}${data.telemetryMode.slice(1)}`}
+          body={
+            'No Azure workloads are currently connected.\n\n' +
+            'Deploy monitored workloads and enable Azure telemetry to discover live services.'
+          }
+        />
       )}
 
       {!loading && !error && data && data.services.length > 0 && (
         <div className={s.grid}>
           {data.services.map((svc) => (
-            <ServiceTile key={svc.name} svc={svc} />
+            <ServiceTile key={svc.name} svc={svc} onOpen={() => setSelected(svc)} />
           ))}
         </div>
       )}
+
+      <ServiceBlade service={selected} open={selected !== null} onClose={() => setSelected(null)} />
     </>
   )
 }

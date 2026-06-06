@@ -16,6 +16,8 @@ import {
   ClockFilled,
   BotRegular,
   BotFilled,
+  DataPieRegular,
+  DataPieFilled,
   SettingsRegular,
   SettingsFilled,
   ChevronDoubleLeftRegular,
@@ -37,6 +39,7 @@ const MAIN_ITEMS: NavItemConfig[] = [
   { id: 'incidents', label: 'Active Incidents',  icon: AlertRegular,    activeIcon: AlertFilled, badge: 1 },
   { id: 'history',   label: 'History',           icon: ClockRegular,    activeIcon: ClockFilled },
   { id: 'agents',    label: 'Agents',            icon: BotRegular,      activeIcon: BotFilled },
+  { id: 'analytics', label: 'Analytics',         icon: DataPieRegular,  activeIcon: DataPieFilled },
 ]
 
 const BOTTOM_ITEMS: NavItemConfig[] = [

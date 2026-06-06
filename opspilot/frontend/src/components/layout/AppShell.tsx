@@ -1,21 +1,25 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { makeStyles, tokens, Button } from '@fluentui/react-components'
 import { HomeRegular } from '@fluentui/react-icons'
 import { NavBar } from './NavBar'
 import { SideNav } from './SideNav'
 import { GlobalCommandBar } from '../command/GlobalCommandBar'
 import { IncidentPanel } from '../incident/IncidentPanel'
-import { AgentActivityPanel } from '../agents/AgentActivityPanel'
+import { AgentsPanel } from '../agents/AgentsPanel'
 import { HistoryPanel } from '../history/HistoryPanel'
 import { RecommendationPanel } from '../recommendations/RecommendationPanel'
+import { AnalyticsPanel } from '../analytics/AnalyticsPanel'
+import { SettingsPanel } from '../settings/SettingsPanel'
 import { ErrorBoundary } from '../shared/ErrorBoundary'
 import { useNotify } from '../../store/NotificationContext'
+import { usePreferences } from '../../store/PreferencesContext'
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
   incidents: 'Active Incidents',
   history:   'History',
   agents:    'Agents',
+  analytics: 'Analytics',
   settings:  'Settings',
 }
 
@@ -83,6 +87,7 @@ export const AppShell: React.FC = () => {
   const notify = useNotify()
   const [isNavCollapsed, setIsNavCollapsed] = useState(false)
   const [activePage, setActivePage] = useState('home')
+  const { autoRefreshSeconds } = usePreferences()
   // Bumping this remounts the active panel, which re-runs its data hooks —
   // i.e. a real refresh of agent statuses, confidence, and timeline.
   const [refreshNonce, setRefreshNonce] = useState(0)
@@ -91,6 +96,33 @@ export const AppShell: React.FC = () => {
     setRefreshNonce((n) => n + 1)
     notify({ title: 'Refreshing analysis', body: 'Re-running agent investigation…', intent: 'info' })
   }, [notify])
+
+  // Auto-refresh: silently remount the active panel on the configured cadence
+  // (Settings → General → Auto refresh interval). 0 = off.
+  useEffect(() => {
+    if (!autoRefreshSeconds) return
+    const id = window.setInterval(() => setRefreshNonce((n) => n + 1), autoRefreshSeconds * 1000)
+    return () => window.clearInterval(id)
+  }, [autoRefreshSeconds])
+
+  // Decoupled refresh trigger: any component can dispatch `opspilot:refresh`
+  // (e.g. the incident actions menu's "Re-run Investigation") to remount the
+  // active panel and re-run its data hooks.
+  useEffect(() => {
+    const onRefresh = () => handleRefresh()
+    window.addEventListener('opspilot:refresh', onRefresh)
+    return () => window.removeEventListener('opspilot:refresh', onRefresh)
+  }, [handleRefresh])
+
+  // Decoupled navigation: `opspilot:navigate` with detail `{ page }`.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const page = (e as CustomEvent<{ page: string }>).detail?.page
+      if (page) setActivePage(page)
+    }
+    window.addEventListener('opspilot:navigate', onNav)
+    return () => window.removeEventListener('opspilot:navigate', onNav)
+  }, [])
 
   return (
     <div className={styles.root}>
@@ -114,15 +146,19 @@ export const AppShell: React.FC = () => {
               {activePage === 'incidents'
                 ? <IncidentPanel />
                 : activePage === 'agents'
-                  ? <AgentActivityPanel />
+                  ? <AgentsPanel />
                   : activePage === 'history'
                     ? <HistoryPanel />
-                    : activePage === 'home'
-                      ? <RecommendationPanel />
-                      : <PagePlaceholder
-                          label={PAGE_LABELS[activePage] ?? activePage}
-                          onNavigate={setActivePage}
-                        />
+                    : activePage === 'analytics'
+                      ? <AnalyticsPanel />
+                      : activePage === 'settings'
+                        ? <SettingsPanel />
+                        : activePage === 'home'
+                          ? <RecommendationPanel />
+                          : <PagePlaceholder
+                              label={PAGE_LABELS[activePage] ?? activePage}
+                              onNavigate={setActivePage}
+                            />
               }
             </ErrorBoundary>
           </div>
@@ -141,7 +177,7 @@ const PagePlaceholder: React.FC<{ label: string; onNavigate: (page: string) => v
     <div className={styles.placeholder}>
       <div className={styles.hexMark} />
       <p className={styles.pageTitle}>{label}</p>
-      <p className={styles.pageSubtitle}>This workspace is not part of the current sprint.</p>
+      <p className={styles.pageSubtitle}>This workspace isn’t available right now.</p>
       <Button
         icon={<HomeRegular />}
         appearance="primary"

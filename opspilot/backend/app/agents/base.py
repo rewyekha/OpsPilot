@@ -126,6 +126,13 @@ class BaseAgent(ABC):
         completed_at = datetime.now(timezone.utc).isoformat()
         duration_ms = round((time.monotonic() - t0) * 1000, 1)
 
+        # Stamp execution timing onto the finding so the orchestrator can persist a
+        # real per-agent execution record (duration / start / end / mode).
+        finding.metadata["_duration_ms"] = duration_ms
+        finding.metadata["_started_at"] = started_at
+        finding.metadata["_completed_at"] = completed_at
+        finding.metadata["_mode"] = mode
+
         log.info(
             "agent.completed",
             agent=self.role,
