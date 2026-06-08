@@ -59,7 +59,11 @@ export function useActiveIncidentWithRecommendations(): FetchState<IncidentWithR
   useEffect(() => {
     const bump = () => setNonce((n) => n + 1)
     window.addEventListener('opspilot:refresh', bump)
-    return () => window.removeEventListener('opspilot:refresh', bump)
+    window.addEventListener('opspilot:poll', bump)
+    return () => {
+      window.removeEventListener('opspilot:refresh', bump)
+      window.removeEventListener('opspilot:poll', bump)
+    }
   }, [])
 
   useEffect(() => {
@@ -72,7 +76,11 @@ export function useActiveIncidentWithRecommendations(): FetchState<IncidentWithR
         setState({ data: rec ? fromRecord(rec) : null, loading: false, error: null })
       })
       .catch((err: unknown) => {
-        if (!cancelled) setState({ data: null, loading: false, error: err instanceof Error ? err.message : 'Failed to load incident' })
+        if (cancelled) return
+        // Keep existing data on a background-refetch error (no blanking).
+        setState((s) => (s.data === null
+          ? { data: null, loading: false, error: err instanceof Error ? err.message : 'Failed to load incident' }
+          : { ...s, loading: false }))
       })
     return () => { cancelled = true }
   }, [nonce])

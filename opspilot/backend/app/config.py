@@ -65,33 +65,29 @@ class Settings(BaseSettings):
     # un-escalated (existing behavior unchanged).
     reasoning_escalation_threshold: float = 70.0
 
-    # ── Demo mode (Phase 5) ───────────────────────────────────────────────────
-    # When true, the combined confidence is intentionally lowered so the o4-mini
-    # reasoning escalation always fires — useful for demoing the reasoning path.
-    # DISABLED by default; production behavior is unchanged.
-    low_confidence_demo: bool = False
-
-    # ── API security (Phase 5) ────────────────────────────────────────────────
+    # ── API security ──────────────────────────────────────────────────────────
     # Optional shared key for the model-invoking test endpoints. Empty = open
     # (local dev unchanged). When set, callers must send `X-API-KEY: <value>`.
     dev_api_key: str = ""
 
-    # ── Azure AI Foundry ─────────────────────────────────────────────────────
-    azure_ai_foundry_project_name: str = ""
-    azure_ai_foundry_resource_group: str = ""
-    azure_subscription_id: str = ""
+    # ── Autonomous incident detection (background monitor) ────────────────────
+    # When enabled (and TELEMETRY_MODE=azure), a background loop scans telemetry
+    # and AUTO-CREATES + AUTO-INVESTIGATES incidents when thresholds are breached.
+    auto_detection_enabled: bool = True
+    detection_interval_seconds: int = 30      # how often the monitor scans
+    detection_cooldown_seconds: int = 600     # min gap between auto-runs per incident
+    # Detection thresholds (telemetry-driven; never fabricated).
+    detect_error_rate_warn_pct: float = 5.0   # > this for the window  → P2
+    detect_error_rate_crit_pct: float = 20.0  # > this                  → P1
+    detect_latency_p95_ms: float = 2000.0     # p95 > this              → P2
+    detect_restart_storm_count: int = 5       # container restarts in window → P1
 
-    # ── Azure Cosmos DB ──────────────────────────────────────────────────────
-    cosmos_db_endpoint: str = ""
-    cosmos_db_database: str = "opspilot"
-    cosmos_db_incidents_container: str = "incidents"
-
-    # ── Azure AI Search ──────────────────────────────────────────────────────
-    azure_search_endpoint: str = ""
-    azure_search_index_name: str = "incident-history"
-
-    # ── Redis ────────────────────────────────────────────────────────────────
-    redis_url: str = "redis://localhost:6379/0"
+    # ── Demo scenarios (judging control panel) ────────────────────────────────
+    # Gates the /api/demo/* endpoints that execute the infra/scripts/scenarios
+    # PowerShell scripts against the deployed workload. OFF unless explicitly set.
+    demo_mode_enabled: bool = False
+    demo_resource_group: str = "rg-opspilot"
+    demo_app_name: str = "album-api"
 
 
 @lru_cache

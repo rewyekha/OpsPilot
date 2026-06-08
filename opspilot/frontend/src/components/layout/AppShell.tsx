@@ -10,9 +10,11 @@ import { HistoryPanel } from '../history/HistoryPanel'
 import { RecommendationPanel } from '../recommendations/RecommendationPanel'
 import { AnalyticsPanel } from '../analytics/AnalyticsPanel'
 import { SettingsPanel } from '../settings/SettingsPanel'
+import { DemoScenariosPanel } from '../demo/DemoScenariosPanel'
 import { ErrorBoundary } from '../shared/ErrorBoundary'
 import { useNotify } from '../../store/NotificationContext'
 import { usePreferences } from '../../store/PreferencesContext'
+import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
@@ -20,8 +22,13 @@ export const PAGE_LABELS: Record<string, string> = {
   history:   'History',
   agents:    'Agents',
   analytics: 'Analytics',
+  demo:      'Demo Scenarios',
   settings:  'Settings',
 }
+
+// Silent autonomous-update cadence: dispatches `opspilot:poll` so data hooks
+// re-fetch (no remount / no toast). Lets auto-detected incidents appear live.
+const POLL_INTERVAL_MS = 5000
 
 const useStyles = makeStyles({
   root: {
@@ -84,6 +91,7 @@ const useStyles = makeStyles({
 
 export const AppShell: React.FC = () => {
   const styles = useStyles()
+  useMountLog('AppShell') // TEMP-DEBUG
   const notify = useNotify()
   const [isNavCollapsed, setIsNavCollapsed] = useState(false)
   const [activePage, setActivePage] = useState('home')
@@ -113,6 +121,15 @@ export const AppShell: React.FC = () => {
     window.addEventListener('opspilot:refresh', onRefresh)
     return () => window.removeEventListener('opspilot:refresh', onRefresh)
   }, [handleRefresh])
+
+  // Autonomous real-time updates: a silent periodic poll so the dashboard,
+  // active incidents, history, analytics and agents reflect monitor-created
+  // investigations without a manual refresh. Distinct from the heavy remount
+  // refresh above — this only re-runs data hooks.
+  useEffect(() => {
+    const id = window.setInterval(() => window.dispatchEvent(new Event('opspilot:poll')), POLL_INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [])
 
   // Decoupled navigation: `opspilot:navigate` with detail `{ page }`.
   useEffect(() => {
@@ -153,9 +170,11 @@ export const AppShell: React.FC = () => {
                       ? <AnalyticsPanel />
                       : activePage === 'settings'
                         ? <SettingsPanel />
-                        : activePage === 'home'
-                          ? <RecommendationPanel />
-                          : <PagePlaceholder
+                        : activePage === 'demo'
+                          ? <DemoScenariosPanel />
+                          : activePage === 'home'
+                            ? <RecommendationPanel />
+                            : <PagePlaceholder
                               label={PAGE_LABELS[activePage] ?? activePage}
                               onNavigate={setActivePage}
                             />

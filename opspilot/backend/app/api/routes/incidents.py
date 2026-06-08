@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.models.incident import (
     CreateIncidentRequest,
@@ -19,6 +19,7 @@ from app.models.incident import (
     IncidentStatus,
 )
 from app.services import incident_service
+from app.services.investigation_runner import trigger_investigation
 
 log = structlog.get_logger(__name__)
 
@@ -62,16 +63,14 @@ async def get_incident(incident_id: str) -> IncidentRecord:
     status_code=status.HTTP_201_CREATED,
     summary="Create incident and trigger investigation",
     description=(
-        "Creates a new incident record and immediately starts a background "
-        "investigation via the InvestigationOrchestrator. The incident is "
-        "available via GET /api/incidents/{id} and its SSE stream via "
+        "Creates a user-reported incident and immediately starts a real "
+        "investigation via the SINGLE dispatch helper (trigger_investigation → "
+        "InvestigationOrchestrator). The incident is available via "
+        "GET /api/incidents/{id} and its SSE stream via "
         "GET /api/incidents/{id}/stream as soon as this endpoint returns."
     ),
 )
-async def create_incident(
-    body: CreateIncidentRequest,
-    background_tasks: BackgroundTasks,
-) -> IncidentRecord:
+async def create_incident(body: CreateIncidentRequest) -> IncidentRecord:
     now = datetime.now(timezone.utc)
     incident_id = f"INC-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -90,15 +89,10 @@ async def create_incident(
     # resolves immediately (this is an allowed, non-telemetry incident source).
     incident_service.register_user_incident(incident)
 
-    # Kick off investigation in background — does not block the HTTP response
-    from app.agents.orchestrator import InvestigationOrchestrator
-    orchestrator = InvestigationOrchestrator()
-    background_tasks.add_task(
-        orchestrator.run,
-        incident_id,
-        body.description,
-        body.affected_services,
-    )
+    # Dispatch through the one guarded helper used by EVERY trigger path
+    # (manual + autonomous). trigger_investigation no-ops if a run is already
+    # active for this incident_id, so there is exactly one investigation per incident.
+    trigger_investigation(incident_id, body.description, body.affected_services)
 
     log.info(
         "incidents.created",

@@ -20,7 +20,7 @@ thresholds are intentionally conservative; tune them in
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.telemetry.base import TelemetryProvider
@@ -317,24 +317,137 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
             error_rate_per_minute=round(total / max(window_minutes, 1), 1),
         )
 
-    # ── Incident generation ───────────────────────────────────────────────────
+    # ── Incident generation (autonomous detection) ────────────────────────────
 
     def detect_incidents(self) -> list[DetectedIncident]:
+        """Scan telemetry and surface incidents that breach configured thresholds.
+
+        Telemetry-driven ONLY. Each candidate is derived from real Application
+        Insights / Log Analytics signals. Returns [] when nothing breaches — it
+        never fabricates an incident. Evaluated per service:
+
+          • restart storm        (>= N container restarts / 15m)        → P1
+          • service down         (active in 15m, ZERO requests in 5m)    → P1
+          • critical error rate  (> crit% failing requests / 5m)        → P1
+          • elevated error rate  (> warn% failing requests / 5m)        → P2
+          • high latency         (p95 > threshold ms / 5m)              → P2
+
+        Deployment regressions surface here as the error-rate spike they cause.
+        """
+        from app.config import get_settings
+
+        cfg = get_settings()
         incidents: list[DetectedIncident] = []
         for service in self.list_services():
-            health = self.get_service_health(service)
-            if health.status is HealthStatus.UNHEALTHY:
-                incidents.append(
-                    DetectedIncident(
-                        service=service,
-                        title=f"{service}: error rate {health.error_rate_pct:.0f}% / p99 {health.response_time_ms:.0f}ms",
-                        severity="P1",
-                        detectedAt=health.last_incident or "",
-                        signal="error_rate_pct" if health.error_rate_pct >= _ERROR_RATE_UNHEALTHY else "latency_p99_ms",
-                        summary=(
-                            f"{service} breached health thresholds "
-                            f"(error rate {health.error_rate_pct:.1f}%, p99 {health.response_time_ms:.0f}ms)."
-                        ),
-                    )
-                )
+            det = self._detect_for_service(service, cfg)
+            if det is not None:
+                incidents.append(det)
         return incidents
+
+    @staticmethod
+    def _now_iso() -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def _detect_for_service(self, service: str, cfg: Any) -> DetectedIncident | None:
+        rows = self._query(
+            f"""
+            let svc = "{service}";
+            let recent = AppRequests | where AppRoleName == svc and TimeGenerated > ago(5m);
+            let prior = AppRequests | where AppRoleName == svc and TimeGenerated > ago(15m);
+            print
+                total5 = toscalar(recent | count),
+                fail5 = toscalar(recent | where Success == false | count),
+                p95 = toscalar(recent | summarize percentile(DurationMs, 95)),
+                total15 = toscalar(prior | count),
+                lastSeen = toscalar(prior | summarize max(TimeGenerated))
+            """,
+            window_minutes=15,
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        total5 = float(r.get("total5") or 0)
+        fail5 = float(r.get("fail5") or 0)
+        p95 = float(r.get("p95") or 0.0)
+        total15 = float(r.get("total15") or 0)
+        last_seen = str(r.get("lastSeen") or "") or None
+        now = self._now_iso()
+
+        # 1) Container restart storm (best-effort; ContainerAppSystemLogs_CL may be absent).
+        restarts = self._restart_count(service)
+        if restarts >= cfg.detect_restart_storm_count:
+            return DetectedIncident(
+                service=service,
+                title=f"{service}: container restart storm ({restarts} restarts/15m)",
+                severity="P1", detectedAt=now, signal="restart_storm",
+                summary=(f"{service} restarted {restarts} times in the last 15 minutes "
+                         f"(>= {cfg.detect_restart_storm_count}) — container instability."),
+            )
+
+        # 2) Service down — was serving traffic, now zero requests.
+        if total5 == 0 and total15 > 0:
+            return DetectedIncident(
+                service=service,
+                title=f"{service}: service down (0 requests in 5m)",
+                severity="P1", detectedAt=last_seen or now, signal="service_down",
+                summary=(f"{service} served {int(total15)} requests in the prior 15m window but "
+                         f"ZERO in the last 5m — unreachable / scaled to zero / crashed."),
+            )
+        if total5 == 0:
+            return None  # idle / not currently serving → UNKNOWN, never fabricate
+
+        error_rate = fail5 / total5 * 100.0
+
+        # 3) Critical error rate.
+        if error_rate > cfg.detect_error_rate_crit_pct:
+            return DetectedIncident(
+                service=service,
+                title=f"{service}: error rate {error_rate:.0f}% (critical)",
+                severity="P1", detectedAt=now, signal="error_rate_critical",
+                summary=(f"{service} error rate is {error_rate:.1f}% over the last 5m "
+                         f"({int(fail5)}/{int(total5)} requests failing) — above the "
+                         f"{cfg.detect_error_rate_crit_pct:.0f}% critical threshold."),
+            )
+
+        # 4) Elevated error rate.
+        if error_rate > cfg.detect_error_rate_warn_pct:
+            return DetectedIncident(
+                service=service,
+                title=f"{service}: error rate {error_rate:.0f}%",
+                severity="P2", detectedAt=now, signal="error_rate_elevated",
+                summary=(f"{service} error rate is {error_rate:.1f}% over the last 5m "
+                         f"({int(fail5)}/{int(total5)} failing) — above the "
+                         f"{cfg.detect_error_rate_warn_pct:.0f}% threshold."),
+            )
+
+        # 5) High latency (p95).
+        if p95 > cfg.detect_latency_p95_ms:
+            return DetectedIncident(
+                service=service,
+                title=f"{service}: p95 latency {p95:.0f}ms",
+                severity="P2", detectedAt=now, signal="latency_p95",
+                summary=(f"{service} p95 response time is {p95:.0f}ms over the last 5m — "
+                         f"above the {cfg.detect_latency_p95_ms:.0f}ms threshold."),
+            )
+
+        return None
+
+    def _restart_count(self, service: str) -> int:
+        """Container restarts in the last 15m from Container Apps system logs.
+        Returns 0 if the table is absent (best-effort; never fabricates)."""
+        rows = self._query(
+            f"""
+            ContainerAppSystemLogs_CL
+            | where ContainerAppName_s == "{service}" and TimeGenerated > ago(15m)
+            | where Reason_s in ("Killing", "BackOff", "Unhealthy", "Restarting")
+                 or Log_s has "restart"
+            | count
+            """,
+            window_minutes=15,
+        )
+        if not rows:
+            return 0
+        try:
+            return int(rows[0].get("Count") or rows[0].get("count_") or 0)
+        except (TypeError, ValueError):
+            return 0

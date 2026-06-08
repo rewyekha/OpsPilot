@@ -1,4 +1,4 @@
-import { apiPost } from './client'
+import { apiFetch, apiPost } from './client'
 
 export interface ApiIncidentRecord {
   id: string
@@ -32,4 +32,7 @@ export const incidentsApi = {
       affected_services: body.affected_services,
       reporter: body.reporter ?? 'operator',
     }),
+
+  /** Currently-active incidents (telemetry-detected + user-created). [] when none. */
+  active: (): Promise<ApiIncidentRecord[]> => apiFetch<ApiIncidentRecord[]>('/api/incidents/active'),
 }

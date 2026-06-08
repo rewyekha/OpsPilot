@@ -33,9 +33,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         host=settings.api_host,
         port=settings.api_port,
         cors_origins=settings.api_cors_origins,
+        telemetry_mode=settings.telemetry_mode,
+        auto_detection=settings.auto_detection_enabled,
     )
-    yield
-    log.info("shutdown")
+    # Autonomous incident detection — scans telemetry and auto-investigates.
+    from app.services.incident_monitor import get_incident_monitor
+    monitor = get_incident_monitor()
+    monitor.start()
+    try:
+        yield
+    finally:
+        await monitor.stop()
+        log.info("shutdown")
 
 
 def create_app() -> FastAPI:

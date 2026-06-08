@@ -56,3 +56,18 @@ async def list_monitored_services() -> MonitoredServicesResponse:
 
     log.info("system.services.listed", telemetry_mode=mode, count=len(services))
     return MonitoredServicesResponse(telemetryMode=mode, services=services)
+
+
+@router.get(
+    "/system/monitor",
+    summary="Autonomous incident-detection monitor status",
+    description=(
+        "Status of the background monitor that scans Azure telemetry and "
+        "auto-creates + auto-investigates incidents. Drives the dashboard's "
+        "'Autonomous Detection' indicator."
+    ),
+)
+async def monitor_status() -> dict:
+    from app.services.incident_monitor import get_incident_monitor
+
+    return get_incident_monitor().status()

@@ -8,6 +8,7 @@ from app.api.routes.insights import router as insights_router
 from app.api.routes.system import router as system_router
 from app.api.routes.services import router as services_router
 from app.api.routes.provider_test import router as provider_test_router
+from app.api.routes.demo import router as demo_router
 
 router = APIRouter()
 
@@ -19,3 +20,4 @@ router.include_router(insights_router)
 router.include_router(system_router)
 router.include_router(services_router)
 router.include_router(provider_test_router)
+router.include_router(demo_router)

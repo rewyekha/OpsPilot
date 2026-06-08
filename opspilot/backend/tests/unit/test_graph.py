@@ -94,20 +94,21 @@ async def test_graph_routes_through_reasoning_when_escalated(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_demo_mode_forces_escalation_at_default_threshold(monkeypatch):
-    """LOW_CONFIDENCE_DEMO lowers combined confidence so o4-mini escalation fires
-    even at the default threshold; production (flag off) does not escalate."""
+async def test_confidence_is_not_artificially_manipulated(monkeypatch):
+    """Escalation is driven by REAL combined confidence vs the threshold only —
+    there is no demo flag that fabricates/lowers confidence (removed for the
+    reality pass). At the default threshold the high-confidence path does NOT
+    escalate."""
     monkeypatch.delenv("REASONING_ESCALATION_THRESHOLD", raising=False)  # default 70
-    monkeypatch.setenv("LOW_CONFIDENCE_DEMO", "true")
     get_settings.cache_clear()
-    events = await _run("GRAPH-DEMO")
-    completed = [e["agent_name"] for e in events if e["event_type"] == "agent.completed"]
+    events = await _run("GRAPH-REAL")
     types = [e["event_type"] for e in events]
-    assert "reasoning" in completed
-    assert "reasoning.escalated" in types
     rc = next(e for e in events if e["event_type"] == "root_cause.updated")["payload"]
-    assert rc["escalated"] is True
-    assert rc["combined_confidence"] < get_settings().reasoning_escalation_threshold
+    # Real combined confidence (94.0) is above the default 70 threshold → no escalation,
+    # and the value is the genuine one (never scaled down by a demo flag).
+    assert "reasoning.escalated" not in types
+    assert rc["escalated"] is False
+    assert rc["combined_confidence"] >= get_settings().reasoning_escalation_threshold
 
 
 def test_graph_builds_in_foundry_mode(monkeypatch):

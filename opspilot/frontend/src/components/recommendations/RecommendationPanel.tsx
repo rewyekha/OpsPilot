@@ -59,6 +59,9 @@ import { RecommendationDrawer } from './RecommendationDrawer'
 import { ActionStatusBadge } from '../actions/ActionStatusBadge'
 import { useSession } from '../../store/SessionContext'
 import { useFormatters } from '../../store/PreferencesContext'
+import { useActiveIncidents } from '../../hooks/useActiveIncidents'
+import { MonitorBadge } from '../shared/MonitorBadge'
+import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 import { formatCurrency, formatCompactNumber, formatDuration } from '../../utils/formatters'
 import { confidenceColor } from '../../theme/tokens'
 
@@ -249,14 +252,20 @@ const Kpi: React.FC<KpiProps> = ({ label, children }) => {
 
 export const RecommendationPanel: React.FC = () => {
   const s = useStyles()
+  useMountLog('RecommendationPanel') // TEMP-DEBUG
   // Single source of truth — the latest persisted investigation. The incident
   // summary, confidence, blast radius, cost and recommendations all come from a
   // real completed run (or the empty state); nothing is seeded from static data.
   const latest = useLatestInvestigation()
+  // Currently-active incidents (telemetry-detected by the autonomous monitor or
+  // user-created). Polled so an AUTO-detected incident appears here in real time.
+  const active = useActiveIncidents()
   // Live investigation queue — driven entirely by real SSE orchestrator events.
-  // Watches the latest real investigation's incident (read-only; opening the
-  // stream never starts a run). Empty id → no stream, empty queue.
-  const live = useLiveInvestigation(latest.data?.incident_id ?? '')
+  // Watches the active incident if one exists (so the autonomous run streams live
+  // before its record persists), else the latest persisted investigation.
+  // Read-only; opening the stream never starts a run. Empty id → no stream.
+  const watchId = active.data?.[0]?.id ?? latest.data?.incident_id ?? ''
+  const live = useLiveInvestigation(watchId)
   const streamStatus = live.connection
   const { jobs, timelineEvents, incidentStatus } = useSession()
   const fmt = useFormatters()
@@ -302,6 +311,7 @@ export const RecommendationPanel: React.FC = () => {
       <div className={s.headerRow}>
         <span className={s.sectionLabel}>Incident Summary</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <MonitorBadge />
           {/* One primary action per card — all investigation actions live inside
               the blade modal (Azure Portal / Grafana interaction model). */}
           <Button

@@ -133,13 +133,7 @@ def build_investigation_graph(orch: "InvestigationOrchestrator"):
                 fc.get("root_cause"),
             ]
         )
-        settings = get_settings()
-        threshold = settings.reasoning_escalation_threshold
-        if settings.low_confidence_demo:
-            # Demo mode: intentionally drop combined confidence below the
-            # threshold so the o4-mini reasoning escalation always fires. Isolated to
-            # demo mode; production behavior is unchanged.
-            combined = round(min(combined, threshold * 0.6), 1)
+        threshold = get_settings().reasoning_escalation_threshold
         escalated = combined < threshold
         if escalated:
             await orch._emit(

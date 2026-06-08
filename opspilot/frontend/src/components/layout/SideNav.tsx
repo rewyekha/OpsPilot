@@ -20,6 +20,8 @@ import {
   DataPieFilled,
   SettingsRegular,
   SettingsFilled,
+  BeakerRegular,
+  BeakerFilled,
   ChevronDoubleLeftRegular,
   ChevronDoubleRightRegular,
 } from '@fluentui/react-icons'
@@ -36,10 +38,11 @@ interface NavItemConfig {
 
 const MAIN_ITEMS: NavItemConfig[] = [
   { id: 'home',      label: 'Dashboard',        icon: HomeRegular,     activeIcon: HomeFilled },
-  { id: 'incidents', label: 'Active Incidents',  icon: AlertRegular,    activeIcon: AlertFilled, badge: 1 },
+  { id: 'incidents', label: 'Active Incidents',  icon: AlertRegular,    activeIcon: AlertFilled },
   { id: 'history',   label: 'History',           icon: ClockRegular,    activeIcon: ClockFilled },
   { id: 'agents',    label: 'Agents',            icon: BotRegular,      activeIcon: BotFilled },
   { id: 'analytics', label: 'Analytics',         icon: DataPieRegular,  activeIcon: DataPieFilled },
+  { id: 'demo',      label: 'Demo Scenarios',    icon: BeakerRegular,   activeIcon: BeakerFilled },
 ]
 
 const BOTTOM_ITEMS: NavItemConfig[] = [

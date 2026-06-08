@@ -8,6 +8,7 @@ import { makeStyles, tokens } from '@fluentui/react-components'
 import { useLatestInvestigation } from '../../hooks/useInsights'
 import { useSession } from '../../store/SessionContext'
 import { confidenceColor, LIFECYCLE_LABELS, asLifecycle } from '../../theme/tokens'
+import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 import { formatDuration } from '../../utils/formatters'
 
 const useStyles = makeStyles({
@@ -29,6 +30,7 @@ const useStyles = makeStyles({
 
 export const DashboardSummary: React.FC = () => {
   const s = useStyles()
+  useMountLog('DashboardSummary') // TEMP-DEBUG
   const { data: record } = useLatestInvestigation()
   const { incidentStatus } = useSession()
 
