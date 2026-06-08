@@ -15,7 +15,7 @@ import {
 import { BladeModal, BladeSection } from '../shared/BladeModal'
 import { useSession } from '../../store/SessionContext'
 import { useNotify } from '../../store/NotificationContext'
-import { HEALTH_COLORS, HEALTH_LABELS, asHealth } from '../../theme/tokens'
+import { deriveServiceStatus, STATUS_STYLE } from '../../theme/serviceStatus'
 import { useFormatters } from '../../store/PreferencesContext'
 import type { ApiServiceHealth } from '../../api/services'
 
@@ -40,11 +40,11 @@ export const ServiceBlade: React.FC<{ service: ApiServiceHealth | null; open: bo
   const fmt = useFormatters()
 
   if (!service) return null
-  const health = asHealth(service.status)
-  const cfg = HEALTH_COLORS[health]
+  const status = deriveServiceStatus(service)
+  const cfg = STATUS_STYLE[status]
 
   const investigate = () => {
-    createInvestigation({ description: `Investigate ${service.name}: ${HEALTH_LABELS[health]} (error rate ${service.errorRatePct.toFixed(1)}%, p99 ${Math.round(service.responseTimeMs)}ms)`, affectedServices: [service.name] })
+    createInvestigation({ description: `Investigate ${service.name}: ${status} (error rate ${service.errorRatePct.toFixed(1)}%, p99 ${Math.round(service.responseTimeMs)}ms)`, affectedServices: [service.name] })
     window.dispatchEvent(new CustomEvent('opspilot:navigate', { detail: { page: 'incidents' } }))
     onClose()
   }
@@ -61,7 +61,7 @@ export const ServiceBlade: React.FC<{ service: ApiServiceHealth | null; open: bo
       headerBadge={
         <span className={s.badge} style={{ backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.text }}>
           <span className={s.dot} style={{ backgroundColor: cfg.color }} />
-          {HEALTH_LABELS[health].toUpperCase()}
+          {status}
         </span>
       }
       actions={
@@ -75,7 +75,7 @@ export const ServiceBlade: React.FC<{ service: ApiServiceHealth | null; open: bo
     >
       <BladeSection label="Health">
         <div className={s.metrics}>
-          <div className={s.metric}><span className={s.mLabel}>Status</span><span className={s.mValue} style={{ color: cfg.text }}>{HEALTH_LABELS[health]}</span></div>
+          <div className={s.metric}><span className={s.mLabel}>Status</span><span className={s.mValue} style={{ color: cfg.text }}>{status}</span></div>
           <div className={s.metric}><span className={s.mLabel}>Last Incident</span><span className={s.mValue}>{service.lastIncident ? fmt.relative(service.lastIncident) : '—'}</span></div>
         </div>
       </BladeSection>

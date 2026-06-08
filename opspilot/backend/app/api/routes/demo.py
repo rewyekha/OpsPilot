@@ -12,8 +12,9 @@ surfaced.
 """
 from __future__ import annotations
 
-import asyncio
 import shutil
+import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -41,11 +42,11 @@ SCENARIOS: dict[str, dict] = {
     "deployment-regression": {
         "name": "Deployment Regression",
         "description": "Deploys a broken revision (bad image) that fails to serve.",
-        "expected": "P1 deployment / service-down incident",
+        "expected": "P1 bad-deploy",
     },
     "service-outage": {
         "name": "Service Outage",
-        "description": "Scales the app to zero replicas — service becomes unreachable.",
+        "description": "Disables ingress — service becomes unreachable.",
         "expected": "P1 service-down incident",
     },
     "restart-storm": {
@@ -56,7 +57,11 @@ SCENARIOS: dict[str, dict] = {
 }
 
 # id -> {proc, action, started_at, output, returncode}
-_RUNS: dict[str, dict] = {}
+_RUNS: dict[str, dict] = {}   # key: "<scenario_id>|<app>"
+
+# App → a known HEALTHY endpoint for the traffic-based scenarios. Anything not
+# listed defaults to "/" (works for most apps, e.g. voting-app's root page).
+_HEALTH_PATHS: dict[str, str] = {"album-api": "/albums"}
 
 
 def _scenarios_dir() -> Path:
@@ -68,9 +73,21 @@ def _pwsh() -> str | None:
     return shutil.which("pwsh") or shutil.which("powershell")
 
 
-def _is_running(scenario_id: str) -> bool:
-    st = _RUNS.get(scenario_id)
-    return bool(st and st["proc"].returncode is None)
+def _run_key(scenario_id: str, app: str) -> str:
+    return f"{scenario_id}|{app}"
+
+
+def _resolve_app(app: str | None, cfg: Settings) -> str:
+    return (app or "").strip() or cfg.demo_app_name
+
+
+def _is_running(scenario_id: str, app: str) -> bool:
+    st = _RUNS.get(_run_key(scenario_id, app))
+    return bool(st and not st.get("done"))
+
+
+def _is_running_any(scenario_id: str) -> bool:
+    return any(k.startswith(f"{scenario_id}|") and not v.get("done") for k, v in _RUNS.items())
 
 
 def _require_demo() -> Settings:
@@ -83,48 +100,59 @@ def _require_demo() -> Settings:
     return cfg
 
 
-async def _launch(scenario_id: str, rollback: bool) -> dict:
+def _run_blocking(scenario_id: str, args: list[str], state: dict) -> None:
+    """Run a scenario script to completion in a worker thread. Uses subprocess.Popen
+    (NOT asyncio.create_subprocess_exec) so it works on ANY event loop — the Windows
+    SelectorEventLoop that uvicorn uses does not support asyncio subprocesses, which
+    is what produced the 'NetworkError' on Execute."""
+    try:
+        proc = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        state["pid"] = proc.pid
+        out, _ = proc.communicate()
+        state["output"] = (out or "")[-4000:]
+        state["returncode"] = proc.returncode
+    except Exception as exc:  # noqa: BLE001 - surface the real runner error
+        state["output"] = f"scenario runner error: {exc}"
+        state["returncode"] = -1
+    finally:
+        state["done"] = True
+        log.info("demo.scenario.finished", scenario=scenario_id,
+                 action=state.get("action"), returncode=state.get("returncode"))
+
+
+async def _launch(scenario_id: str, rollback: bool, app: str | None) -> dict:
     cfg = _require_demo()
     if scenario_id not in SCENARIOS:
         raise HTTPException(404, f"Unknown scenario '{scenario_id}'.")
+    app_name = _resolve_app(app, cfg)
     script = _scenarios_dir() / f"{scenario_id}.ps1"
     if not script.exists():
         raise HTTPException(500, f"Scenario script not found: {script}")
     shell = _pwsh()
     if not shell:
         raise HTTPException(500, "PowerShell (pwsh) not found on the backend host.")
-    if _is_running(scenario_id):
-        raise HTTPException(409, f"Scenario '{scenario_id}' is already running.")
+    if _is_running(scenario_id, app_name):
+        raise HTTPException(409, f"Scenario '{scenario_id}' is already running on '{app_name}'.")
 
     args = [
         shell, "-NoProfile", "-File", str(script),
         "-ResourceGroup", cfg.demo_resource_group,
-        "-AppName", cfg.demo_app_name,
+        "-AppName", app_name,
+        "-HealthPath", _HEALTH_PATHS.get(app_name, "/"),
     ]
     if rollback:
         args.append("-Rollback")
 
-    proc = await asyncio.create_subprocess_exec(
-        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-    )
-    state = {
-        "proc": proc, "action": "rollback" if rollback else "execute",
-        "started_at": time.time(), "output": "", "returncode": None,
+    state: dict = {
+        "action": "rollback" if rollback else "execute", "app": app_name,
+        "started_at": time.time(), "output": "", "returncode": None, "done": False, "pid": None,
     }
-    _RUNS[scenario_id] = state
-
-    async def _drain() -> None:
-        assert proc.stdout is not None
-        out = await proc.stdout.read()
-        await proc.wait()
-        state["output"] = out.decode(errors="replace")[-4000:]
-        state["returncode"] = proc.returncode
-        log.info("demo.scenario.finished", scenario=scenario_id,
-                 action=state["action"], returncode=proc.returncode)
-
-    asyncio.create_task(_drain())
-    log.info("demo.scenario.launched", scenario=scenario_id, action=state["action"])
-    return {"scenario": scenario_id, "action": state["action"], "status": "started"}
+    _RUNS[_run_key(scenario_id, app_name)] = state
+    threading.Thread(target=_run_blocking, args=(scenario_id, args, state), daemon=True).start()
+    log.info("demo.scenario.launched", scenario=scenario_id, app=app_name, action=state["action"])
+    return {"scenario": scenario_id, "app": app_name, "action": state["action"], "status": "started"}
 
 
 @router.get("/scenarios", summary="List demo scenarios + demo-mode status")
@@ -136,31 +164,33 @@ async def list_scenarios() -> dict:
         "app_name": cfg.demo_app_name,
         "pwsh_available": _pwsh() is not None,
         "scenarios": [
-            {"id": k, **v, "running": _is_running(k)} for k, v in SCENARIOS.items()
+            {"id": k, **v, "running": _is_running_any(k)} for k, v in SCENARIOS.items()
         ],
     }
 
 
 @router.post("/scenarios/{scenario_id}/run", summary="Execute a demo scenario")
-async def run_scenario(scenario_id: str) -> dict:
-    return await _launch(scenario_id, rollback=False)
+async def run_scenario(scenario_id: str, app: str | None = None) -> dict:
+    return await _launch(scenario_id, rollback=False, app=app)
 
 
 @router.post("/scenarios/{scenario_id}/rollback", summary="Roll back a demo scenario")
-async def rollback_scenario(scenario_id: str) -> dict:
-    return await _launch(scenario_id, rollback=True)
+async def rollback_scenario(scenario_id: str, app: str | None = None) -> dict:
+    return await _launch(scenario_id, rollback=True, app=app)
 
 
 @router.get("/scenarios/{scenario_id}/status", summary="Demo scenario run status")
-async def scenario_status(scenario_id: str) -> dict:
+async def scenario_status(scenario_id: str, app: str | None = None) -> dict:
     if scenario_id not in SCENARIOS:
         raise HTTPException(404, f"Unknown scenario '{scenario_id}'.")
-    st = _RUNS.get(scenario_id)
+    cfg = get_settings()
+    app_name = _resolve_app(app, cfg)
+    st = _RUNS.get(_run_key(scenario_id, app_name))
     if not st:
-        return {"scenario": scenario_id, "state": "idle"}
-    running = st["proc"].returncode is None and st["returncode"] is None
+        return {"scenario": scenario_id, "app": app_name, "state": "idle"}
+    running = not st.get("done")
     return {
-        "scenario": scenario_id,
+        "scenario": scenario_id, "app": app_name,
         "action": st["action"],
         "state": "running" if running else "finished",
         "returncode": st["returncode"],

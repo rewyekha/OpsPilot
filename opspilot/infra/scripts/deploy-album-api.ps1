@@ -37,24 +37,41 @@ $core = Read-Outputs -ResourceGroup $ResourceGroup -Environment $Environment
 if (-not $core) { throw "Core-infra outputs not found. Run ./deploy-core-infra.ps1 first." }
 Write-Info "Environment: $($core.containerAppsEnvironmentName) | Workspace: $($core.logAnalyticsCustomerId)"
 
-# ── Build + deploy (idempotent: `up` updates the app in place) ───────────────
+# ── Resolve the CURRENT Application Insights connection string ────────────────
+# album-api is a Node app: it emits NO telemetry unless its container receives
+# APPLICATIONINSIGHTS_CONNECTION_STRING (bin/www starts the App Insights SDK only
+# when that env var is set). Resolve the value LIVE from the App Insights resource
+# so it is always current — never an empty/stale cached output.
+$aiConn = $core.appInsightsConnectionString
+if ([string]::IsNullOrWhiteSpace($aiConn) -and $core.appInsightsName) {
+    $aiConn = az monitor app-insights component show --app $core.appInsightsName -g $ResourceGroup --query connectionString -o tsv 2>$null
+}
+if ([string]::IsNullOrWhiteSpace($aiConn)) {
+    throw "Application Insights connection string could not be resolved (appInsightsName='$($core.appInsightsName)'). album-api would emit NO telemetry — re-run deploy-core-infra.ps1 or confirm the App Insights resource exists."
+}
+
+# ── Build + deploy WITH the telemetry env injected atomically ────────────────
+# Injecting --env-vars on `up` guarantees the connection string is present on the
+# deployed revision (a prior raw `az containerapp up` without this is exactly why
+# album-api shipped with no env var and emitted nothing).
 # NOTE: `az containerapp up` does NOT accept --only-show-errors.
-Write-Step "Building + deploying $AppName from source"
+Write-Step "Building + deploying $AppName from source (App Insights wired)"
 az containerapp up `
     --name $AppName `
     --resource-group $ResourceGroup `
     --environment $core.containerAppsEnvironmentName `
     --source $source `
     --ingress external `
-    --target-port $targetPort
+    --target-port $targetPort `
+    --env-vars "APPLICATIONINSIGHTS_CONNECTION_STRING=$aiConn" "OPSPILOT_SERVICE_NAME=$AppName"
 if ($LASTEXITCODE -ne 0) { throw "az containerapp up failed (exit $LASTEXITCODE)." }
 
-# ── Wire Application Insights (telemetry → OpsPilot workspace) ────────────────
-Write-Step 'Configuring Application Insights instrumentation'
+# ── Reinforce env vars (idempotent; covers an `up` that ignored --env-vars) ──
+Write-Step 'Verifying Application Insights instrumentation'
 az containerapp update `
     --name $AppName `
     --resource-group $ResourceGroup `
-    --set-env-vars "APPLICATIONINSIGHTS_CONNECTION_STRING=$($core.appInsightsConnectionString)" "OPSPILOT_SERVICE_NAME=$AppName" `
+    --set-env-vars "APPLICATIONINSIGHTS_CONNECTION_STRING=$aiConn" "OPSPILOT_SERVICE_NAME=$AppName" `
     --only-show-errors | Out-Null
 Write-Ok 'Instrumentation env vars set'
 

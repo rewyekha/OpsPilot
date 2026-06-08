@@ -1,650 +1,144 @@
-import React, { useState, useEffect } from 'react'
-import { makeStyles, tokens, mergeClasses, shorthands } from '@fluentui/react-components'
-import {
-  useActiveIncidentWithRecommendations,
-  type IncidentWithRec,
-} from '../../hooks/useIncident'
-import { useSession } from '../../store/SessionContext'
-import { IncidentStatusBadge } from '../shared/SeverityBadge'
+/**
+ * Active Incidents — compact table (Task 4).
+ *
+ * Replaces the oversized single-incident cards with a dense, responsive table
+ * that scales to many incidents. Rows are the live telemetry-detected /
+ * user-created incidents (GET /api/incidents/active), joined with their
+ * persisted investigation record (confidence, duration, root cause, status).
+ */
+import React, { useState } from 'react'
+import { makeStyles, tokens, Button, Spinner } from '@fluentui/react-components'
+import { OpenRegular } from '@fluentui/react-icons'
+import { useActiveIncidents } from '../../hooks/useActiveIncidents'
+import { useInvestigations } from '../../hooks/useInsights'
+import { useFormatters } from '../../store/PreferencesContext'
+import { SeverityBadge } from '../shared/SeverityBadge'
 import { EmptyState } from '../shared/EmptyState'
-
-// ── Local types ───────────────────────────────────────────────────────────────
-
-export interface AffectedService {
-  name: string
-  status: 'critical' | 'degraded' | 'healthy'
-}
-
-interface IncidentDisplay {
-  id: string
-  title: string
-  description: string
-  severity: string
-  severityLabel: string
-  status: string
-  statusLabel: string
-  startedDisplay: string
-  investigationDuration: string
-  affectedServices: AffectedService[]
-  confidence: number
-  blastRadius: number
-  affectedUsers: number
-  errorRate: number
-  businessImpactPerHour: number
-}
-
-// ── Data mapping helpers ───────────────────────────────────────────────────────
-
-const SEVERITY_LABEL: Record<string, string> = {
-  P0: 'OUTAGE',
-  P1: 'CRITICAL',
-  P2: 'HIGH',
-  P3: 'MEDIUM',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  open: 'Open',
-  investigating: 'Investigating',
-  mitigated: 'Mitigated',
-  resolved: 'Resolved',
-  post_mortem: 'Post-Mortem',
-}
-
-function formatUtcDisplay(iso: string): string {
-  const d = new Date(iso)
-  const day = d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
-  const hh = String(d.getUTCHours()).padStart(2, '0')
-  const mm = String(d.getUTCMinutes()).padStart(2, '0')
-  return `${day} · ${hh}:${mm} UTC`
-}
-
-function formatDuration(startIso: string, endIso: string): string {
-  const diffMs = new Date(endIso).getTime() - new Date(startIso).getTime()
-  const total = Math.max(0, Math.floor(diffMs / 1000))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':')
-}
-
-function mapToDisplay(d: IncidentWithRec): IncidentDisplay {
-  const { incident, recommendations } = d
-  const rc = recommendations?.root_cause
-
-  // Derive a short title from the first sentence of description
-  const title =
-    incident.description.split(/\.\s/)[0].replace(/\.$/, '') ||
-    `Incident ${incident.id}`
-
-  // Map affected_services: first is critical, rest are degraded
-  const affectedServices: AffectedService[] = incident.affected_services.map(
-    (name, idx) => ({ name, status: idx === 0 ? 'critical' : 'degraded' }),
-  )
-
-  return {
-    id: incident.id,
-    title,
-    description: incident.description,
-    severity: incident.severity,
-    severityLabel: SEVERITY_LABEL[incident.severity] ?? incident.severity,
-    status: incident.status,
-    statusLabel: STATUS_LABEL[incident.status] ?? incident.status,
-    startedDisplay: formatUtcDisplay(incident.created_at),
-    investigationDuration: formatDuration(incident.created_at, incident.updated_at),
-    affectedServices,
-    confidence: rc?.confidence ?? 0,
-    blastRadius: rc?.blast_radius ?? incident.affected_services.length,
-    affectedUsers: rc?.affected_users ?? 0,
-    errorRate: incident.error_rate_pct ?? 0,
-    businessImpactPerHour: rc?.hourly_impact_usd ?? 0,
-  }
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
+import { confidenceColor } from '../../theme/tokens'
+import { formatDuration } from '../../utils/formatters'
+import type { InvestigationRecord } from '../../api/insights'
 
 const useStyles = makeStyles({
-  // Page wrapper
-  page: {
-    padding: '24px',
-    maxWidth: '1200px',
-  },
-
-  // ── Card shell ─────────────────────────────────────────────────────────────
-  card: {
-    position: 'relative',
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: '8px',
-    overflow: 'hidden',
-    boxShadow: `0 0 0 1px ${tokens.colorNeutralStroke1}, 0 4px 24px rgba(0, 0, 0, 0.3)`,
-  },
-  // Left severity accent bar — absolutely positioned
-  criticalAccent: {
-    position: 'absolute',
-    top: '0',
-    left: '0',
-    bottom: '0',
-    width: '4px',
-    backgroundColor: '#dc2626',
-    zIndex: 1,
-    pointerEvents: 'none',
-  },
-  // Content shifted right of accent bar
-  cardInner: {
-    paddingLeft: '24px',
-  },
-
-  // ── Section separator ──────────────────────────────────────────────────────
-  sep: {
-    ...shorthands.borderTop('1px', 'solid', tokens.colorNeutralStroke1),
-  },
-
-  // ── Header section ─────────────────────────────────────────────────────────
-  header: {
-    padding: '20px 24px 20px 0',
-  },
-  headerTopRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '14px',
-  },
-  // Pulsing investigating chip
-  statusChip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '7px',
-    padding: '4px 12px 4px 9px',
-    ...shorthands.border('1px', 'solid', 'rgba(220, 38, 38, 0.35)'),
-    borderRadius: '20px',
-    backgroundColor: 'rgba(220, 38, 38, 0.1)',
-  },
-  statusDot: {
-    width: '7px',
-    height: '7px',
-    minWidth: '7px',
-    borderRadius: '50%',
-    backgroundColor: '#dc2626',
-    // @keyframes ops-status-pulse defined in index.html
-    animationName: 'ops-status-pulse',
-    animationDuration: '2s',
-    animationTimingFunction: 'ease-in-out',
-    animationIterationCount: 'infinite',
-  },
-  statusText: {
-    fontSize: '11px',
-    fontWeight: '700',
-    letterSpacing: '0.8px',
-    color: '#f87171',
-  },
-  incidentId: {
-    fontSize: '12px',
-    fontFamily: '"Cascadia Code", "Consolas", monospace',
-    letterSpacing: '0.5px',
-    color: tokens.colorNeutralForeground3,
-  },
-  // Severity row: CRITICAL badge + P1 label
-  severityRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '10px',
-  },
-  criticalBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '2px 10px',
-    ...shorthands.border('1px', 'solid', 'rgba(220, 38, 38, 0.45)'),
-    borderRadius: '4px',
-    backgroundColor: 'rgba(220, 38, 38, 0.14)',
-    fontSize: '11px',
-    fontWeight: '700',
-    letterSpacing: '1px',
-    color: '#f87171',
-  },
-  severityP: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: tokens.colorNeutralForeground3,
-  },
-  // Incident title + description
-  title: {
-    margin: '0 0 6px 0',
-    padding: '0',
-    fontSize: '22px',
-    fontWeight: '700',
-    color: tokens.colorNeutralForeground1,
-    letterSpacing: '-0.4px',
-    lineHeight: '1.3',
-  },
-  subtitle: {
-    margin: '0',
-    padding: '0',
-    fontSize: '13px',
-    color: tokens.colorNeutralForeground2,
-    lineHeight: '1.5',
-  },
-
-  // ── Metrics row ────────────────────────────────────────────────────────────
-  metricsRow: {
-    display: 'flex',
-    alignItems: 'stretch',
-    paddingRight: '24px',
-  },
-  metricCell: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px',
-    padding: '16px 20px',
-    flex: '1',
-    minWidth: '0',
-  },
-  metricLabel: {
-    fontSize: '10px',
-    fontWeight: '700',
-    letterSpacing: '1px',
-    color: tokens.colorNeutralForeground3,
-    textTransform: 'uppercase',
-  },
-  metricPrimary: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: tokens.colorNeutralForeground1,
-    lineHeight: '1.3',
-    whiteSpace: 'nowrap',
-  },
-  metricSub: {
-    fontSize: '12px',
-    color: tokens.colorNeutralForeground3,
-  },
-  // Vertical separator between metric cells
-  metricSep: {
-    width: '1px',
-    backgroundColor: tokens.colorNeutralStroke1,
-    flexShrink: 0,
-    marginTop: '12px',
-    marginBottom: '12px',
-  },
-  // Confidence bar layout
-  confidenceRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginTop: '2px',
-  },
-  barTrack: {
-    flex: '1',
-    height: '6px',
-    backgroundColor: tokens.colorNeutralBackground4,
-    borderRadius: '3px',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: '3px',
-    // width + backgroundColor set via inline style for transition animation
-  },
-
-  // ── Section (services + impact) ─────────────────────────────────────────────
-  section: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    padding: '16px 24px 16px 0',
-  },
-  sectionLabel: {
-    fontSize: '10px',
-    fontWeight: '700',
-    letterSpacing: '1px',
-    color: tokens.colorNeutralForeground3,
-    textTransform: 'uppercase',
-  },
-
-  // ── Affected service chips ──────────────────────────────────────────────────
-  chipsRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-  },
-  chip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '5px 12px',
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
-    borderRadius: '6px',
-    backgroundColor: tokens.colorNeutralBackground3,
-  },
-  chipDot: {
-    width: '7px',
-    height: '7px',
-    minWidth: '7px',
-    borderRadius: '50%',
-  },
-  chipDotCritical: {
-    backgroundColor: '#dc2626',
-    boxShadow: '0 0 6px rgba(220, 38, 38, 0.6)',
-  },
-  chipDotDegraded: {
-    backgroundColor: '#d97706',
-    boxShadow: '0 0 6px rgba(217, 119, 6, 0.5)',
-  },
-  chipLabel: {
-    fontSize: '13px',
-    color: tokens.colorNeutralForeground1,
-    fontFamily: '"Cascadia Code", "Consolas", monospace',
-    whiteSpace: 'nowrap',
-  },
-
-  // ── Impact section ─────────────────────────────────────────────────────────
-  impactBarRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-  },
-  impactBarLabel: {
-    fontSize: '13px',
-    color: tokens.colorNeutralForeground2,
-    width: '84px',
-    flexShrink: 0,
-  },
-  impactPct: {
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#f87171',
-    width: '36px',
-    textAlign: 'right',
-    flexShrink: 0,
-  },
-  // Business impact figure row
-  impactFigure: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '6px',
-    paddingTop: '14px',
-    marginTop: '4px',
-    ...shorthands.borderTop('1px', 'solid', tokens.colorNeutralStroke1),
-  },
-  impactAmount: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#f87171',
-    letterSpacing: '-0.5px',
-    lineHeight: '1',
-  },
-  impactMeta: {
-    fontSize: '13px',
-    color: tokens.colorNeutralForeground3,
-  },
-
-  // ── Loading skeleton ────────────────────────────────────────────────────────
-  skeletonLine: {
-    height: '14px',
-    borderRadius: '4px',
-    backgroundColor: tokens.colorNeutralBackground4,
-    animationName: 'ops-status-pulse',
-    animationDuration: '1.8s',
-    animationTimingFunction: 'ease-in-out',
-    animationIterationCount: 'infinite',
-  },
-  skeletonBlock: {
-    height: '60px',
-    borderRadius: '6px',
-    backgroundColor: tokens.colorNeutralBackground4,
-    animationName: 'ops-status-pulse',
-    animationDuration: '1.8s',
-    animationTimingFunction: 'ease-in-out',
-    animationIterationCount: 'infinite',
-  },
-
-  // ── Error card ──────────────────────────────────────────────────────────────
-  errorCard: {
-    position: 'relative',
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: '8px',
-    overflow: 'hidden',
-    boxShadow: `0 0 0 1px rgba(220, 38, 38, 0.35), 0 4px 24px rgba(0, 0, 0, 0.3)`,
-  },
-  errorAccent: {
-    position: 'absolute',
-    top: '0',
-    left: '0',
-    bottom: '0',
-    width: '4px',
-    backgroundColor: '#dc2626',
-    zIndex: 1,
-    pointerEvents: 'none',
-  },
-  errorContent: {
-    padding: '20px 20px 20px 24px',
-  },
-  errorTitle: {
-    margin: '0 0 6px 0',
-    padding: '0',
-    fontSize: '13px',
-    fontWeight: '700',
-    color: '#f87171',
-  },
-  errorMessage: {
-    margin: '0',
-    padding: '0',
-    fontSize: '12px',
-    color: tokens.colorNeutralForeground3,
-  },
+  page: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '18px 22px' },
+  center: { display: 'flex', justifyContent: 'center', padding: '60px' },
+  headerRow: { display: 'flex', alignItems: 'center', gap: '10px' },
+  title: { fontSize: '18px', fontWeight: 700, color: tokens.colorNeutralForeground1 },
+  count: { fontSize: '12px', fontWeight: 600, padding: '2px 9px', borderRadius: '10px',
+    backgroundColor: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground2 },
+  card: { backgroundColor: tokens.colorNeutralBackground2, border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: '8px', padding: '20px' },
+  tableWrap: { overflowX: 'auto', border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: '8px',
+    backgroundColor: tokens.colorNeutralBackground2 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '12.5px', minWidth: '760px' },
+  th: { textAlign: 'left', padding: '10px 12px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.5px',
+    textTransform: 'uppercase', color: tokens.colorNeutralForeground3,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke1}`, whiteSpace: 'nowrap' },
+  row: { transition: 'background-color 120ms ease', ':hover': { backgroundColor: tokens.colorNeutralBackground3 } },
+  td: { padding: '10px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    color: tokens.colorNeutralForeground2, verticalAlign: 'middle', whiteSpace: 'nowrap' },
+  incTitle: { fontWeight: 600, color: tokens.colorNeutralForeground1, maxWidth: '320px',
+    overflow: 'hidden', textOverflow: 'ellipsis' },
+  incId: { fontSize: '10.5px', color: tokens.colorNeutralForeground4, fontFamily: 'ui-monospace, monospace' },
+  num: { fontVariantNumeric: 'tabular-nums', fontWeight: 600 },
+  pill: { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '2px 9px', borderRadius: '10px',
+    fontSize: '11px', fontWeight: 600 },
+  dot: { width: '6px', height: '6px', borderRadius: '50%' },
 })
 
-// ── Internal sub-components ───────────────────────────────────────────────────
-
-const MetricCell: React.FC<{ label: string; primary: string; sub?: string }> = ({
-  label,
-  primary,
-  sub,
-}) => {
-  const s = useStyles()
-  return (
-    <div className={s.metricCell}>
-      <span className={s.metricLabel}>{label}</span>
-      <span className={s.metricPrimary}>{primary}</span>
-      {sub && <span className={s.metricSub}>{sub}</span>}
-    </div>
-  )
+const STATUS_STYLE: Record<string, { c: string; bg: string }> = {
+  Investigating: { c: '#60a5fa', bg: 'rgba(59,130,246,0.14)' },
+  Investigated: { c: '#4ade80', bg: 'rgba(34,197,94,0.14)' },
 }
 
-const ConfidenceCell: React.FC<{ confidence: number; mounted: boolean }> = ({
-  confidence,
-  mounted,
-}) => {
+const StatusPill: React.FC<{ status: string }> = ({ status }) => {
   const s = useStyles()
+  const cfg = STATUS_STYLE[status] ?? STATUS_STYLE.Investigating
   return (
-    <div className={s.metricCell}>
-      <span className={s.metricLabel}>Confidence Score</span>
-      <div className={s.confidenceRow}>
-        <div className={s.barTrack}>
-          <div
-            className={s.barFill}
-            style={{
-              width: mounted ? `${confidence}%` : '0%',
-              backgroundColor: tokens.colorBrandBackground,
-              transition: 'width 1.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          />
-        </div>
-        <span className={s.metricPrimary}>{confidence}%</span>
-      </div>
-    </div>
+    <span className={s.pill} style={{ backgroundColor: cfg.bg, color: cfg.c }}>
+      <span className={s.dot} style={{ backgroundColor: cfg.c }} />
+      {status}
+    </span>
   )
 }
-
-const ServiceChip: React.FC<{ svc: AffectedService }> = ({ svc }) => {
-  const s = useStyles()
-  const dotClass =
-    svc.status === 'critical'
-      ? mergeClasses(s.chipDot, s.chipDotCritical)
-      : mergeClasses(s.chipDot, s.chipDotDegraded)
-  return (
-    <div className={s.chip}>
-      <div className={dotClass} />
-      <span className={s.chipLabel}>{svc.name}</span>
-    </div>
-  )
-}
-
-// ── IncidentPanel (exported) ──────────────────────────────────────────────────
 
 export const IncidentPanel: React.FC = () => {
   const s = useStyles()
-  const { data, loading, error } = useActiveIncidentWithRecommendations()
-  const { incidentStatus } = useSession()
+  const fmt = useFormatters()
+  const active = useActiveIncidents()
+  const investigations = useInvestigations()
+  const [, setTick] = useState(0)
 
-  // Trigger bar fill animations after first paint
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
+  const recFor = (id: string): InvestigationRecord | undefined =>
+    (investigations.data ?? []).find((r) => r.incident_id === id)
 
-  // ── Loading skeleton ────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className={s.page}>
-        <div className={s.card} style={{ padding: '20px 24px' }}>
-          <div className={s.criticalAccent} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div className={s.skeletonLine} style={{ width: '40%' }} />
-            <div className={s.skeletonLine} style={{ width: '70%', height: '20px' }} />
-            <div className={s.skeletonLine} style={{ width: '90%' }} />
-            <div className={s.skeletonBlock} />
-            <div className={s.skeletonLine} style={{ width: '60%' }} />
-          </div>
-        </div>
-      </div>
-    )
+  const incidents = active.data ?? []
+  const openDashboard = () => {
+    setTick((t) => t + 1)
+    window.dispatchEvent(new CustomEvent('opspilot:navigate', { detail: { page: 'home' } }))
   }
 
-  // ── Error state (a real fetch failure) ──────────────────────────────────────
-  if (error) {
-    return (
-      <div className={s.page}>
-        <div className={s.errorCard}>
-          <div className={s.errorAccent} />
-          <div className={s.errorContent}>
-            <p className={s.errorTitle}>Failed to load incident</p>
-            <p className={s.errorMessage}>{error}</p>
-          </div>
-        </div>
-      </div>
-    )
+  if (active.loading && !active.data) {
+    return <div className={s.center}><Spinner label="Loading active incidents…" /></div>
   }
-
-  // ── Empty state (no active incident — NOT an error) ─────────────────────────
-  if (!data) {
-    return (
-      <div className={s.page}>
-        <div className={s.card} style={{ padding: '22px 24px' }}>
-          <EmptyState
-            title="No active incidents detected"
-            body="All monitored services are healthy. An incident appears here when Azure telemetry reports an anomaly, or when you start an investigation from a service."
-          />
-        </div>
-      </div>
-    )
-  }
-
-  const incident = mapToDisplay(data)
 
   return (
     <div className={s.page}>
-      <div className={s.card}>
-        {/* Left severity accent */}
-        <div className={s.criticalAccent} />
-
-        <div className={s.cardInner}>
-          {/* ── Header ───────────────────────────────────────────────── */}
-          <div className={s.header}>
-            {/* Status chip + Incident ID */}
-            <div className={s.headerTopRow}>
-              <IncidentStatusBadge status={incidentStatus(incident.id)} />
-              <span className={s.incidentId}>{incident.id}</span>
-            </div>
-
-            {/* Severity badge + P-level */}
-            <div className={s.severityRow}>
-              <span className={s.criticalBadge}>{incident.severityLabel}</span>
-              <span className={s.severityP}>{incident.severity}</span>
-            </div>
-
-            {/* Title + description */}
-            <h1 className={s.title}>{incident.title}</h1>
-            <p className={s.subtitle}>{incident.description}</p>
-          </div>
-
-          {/* ── Metrics row ──────────────────────────────────────────── */}
-          <div className={s.sep} />
-          <div className={s.metricsRow}>
-            <MetricCell
-              label="Started"
-              primary={incident.startedDisplay}
-              sub="Incident opened"
-            />
-            <div className={s.metricSep} />
-            <MetricCell
-              label="Duration"
-              primary={incident.investigationDuration}
-              sub="Investigation active"
-            />
-            <div className={s.metricSep} />
-            <MetricCell
-              label="Blast Radius"
-              primary={`${incident.blastRadius} services`}
-              sub={`~${(incident.affectedUsers / 1000).toFixed(0)}K users`}
-            />
-            <div className={s.metricSep} />
-            <ConfidenceCell confidence={incident.confidence} mounted={mounted} />
-          </div>
-
-          {/* ── Affected services ────────────────────────────────────── */}
-          <div className={s.sep} />
-          <div className={s.section}>
-            <span className={s.sectionLabel}>Affected Services</span>
-            <div className={s.chipsRow}>
-              {incident.affectedServices.map((svc) => (
-                <ServiceChip key={svc.name} svc={svc} />
-              ))}
-            </div>
-          </div>
-
-          {/* ── Current impact ───────────────────────────────────────── */}
-          <div className={s.sep} />
-          <div className={s.section}>
-            <span className={s.sectionLabel}>Current Impact</span>
-
-            <div className={s.impactBarRow}>
-              <span className={s.impactBarLabel}>Error Rate</span>
-              <div className={s.barTrack} style={{ flex: 1 }}>
-                <div
-                  className={s.barFill}
-                  style={{
-                    width: mounted ? `${incident.errorRate}%` : '0%',
-                    backgroundColor: '#dc2626',
-                    transition: 'width 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}
-                />
-              </div>
-              <span className={s.impactPct}>{incident.errorRate}%</span>
-            </div>
-
-            <div className={s.impactFigure}>
-              <span className={s.impactAmount}>
-                ${incident.businessImpactPerHour.toLocaleString()}
-              </span>
-              <span className={s.impactMeta}>/ hour estimated business loss</span>
-            </div>
-          </div>
-        </div>
+      <div className={s.headerRow}>
+        <span className={s.title}>Active Incidents</span>
+        <span className={s.count}>{incidents.length} active</span>
       </div>
+
+      {incidents.length === 0 ? (
+        <div className={s.card}>
+          <EmptyState
+            title="No active incidents detected"
+            body="All monitored services are healthy. Incidents appear here automatically when Azure telemetry breaches a threshold, then OpsPilot investigates them."
+          />
+        </div>
+      ) : (
+        <div className={s.tableWrap}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                {['Severity', 'Incident', 'Service', 'Status', 'Confidence', 'Duration', 'Created', 'Action'].map((h) => (
+                  <th key={h} className={s.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {incidents.map((inc) => {
+                const rec = recFor(inc.id)
+                const svc = inc.affected_services?.[0] ?? inc.id.replace(/^INC-/, '')
+                const conf = rec?.combined_confidence ?? 0
+                const status = rec?.status === 'complete' ? 'Investigated' : 'Investigating'
+                const title = rec?.root_cause?.title || inc.description?.split(/\.\s/)[0] || inc.id
+                const severity = rec?.severity || inc.severity || ''
+                return (
+                  <tr key={inc.id} className={s.row}>
+                    <td className={s.td}>{severity ? <SeverityBadge severity={severity} pill /> : '—'}</td>
+                    <td className={s.td}>
+                      <div className={s.incTitle} title={title}>{title}</div>
+                      <div className={s.incId}>{inc.id}</div>
+                    </td>
+                    <td className={s.td}>{svc}</td>
+                    <td className={s.td}><StatusPill status={status} /></td>
+                    <td className={s.td}>
+                      <span className={s.num} style={{ color: conf ? confidenceColor(conf) : tokens.colorNeutralForeground4 }}>
+                        {conf ? `${Math.round(conf)}%` : '—'}
+                      </span>
+                    </td>
+                    <td className={s.td}>{rec ? formatDuration(rec.duration_seconds) : '—'}</td>
+                    <td className={s.td}>{inc.created_at ? fmt.relative(inc.created_at) : '—'}</td>
+                    <td className={s.td}>
+                      <Button size="small" icon={<OpenRegular />} onClick={openDashboard}>Open</Button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

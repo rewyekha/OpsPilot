@@ -144,9 +144,12 @@ function Send-Load {
         $sent += $thisBatch
     }
 
-    $codeArr = $results.ToArray()
-    $latArr  = ($latencies.ToArray() | Sort-Object)
-    $ok      = ($codeArr | Where-Object { $_ -ge 200 -and $_ -lt 400 }).Count
+    # Wrap in @() so .Count is always valid even when a filter matches ZERO items
+    # (e.g. the high-error-rate flood is all 404s → the 2xx filter is empty). Under
+    # Set-StrictMode -Latest, $null.Count throws "property 'Count' cannot be found".
+    $codeArr = @($results.ToArray())
+    $latArr  = @($latencies.ToArray() | Sort-Object)
+    $ok      = @($codeArr | Where-Object { $_ -ge 200 -and $_ -lt 400 }).Count
     $bad     = $codeArr.Count - $ok
     $p95     = 0.0
     if ($latArr.Count -gt 0) {

@@ -25,7 +25,8 @@ param(
     [string]$AppName = 'album-api',
     [string]$BaseUrl = '',          # resolved from az ingress fqdn if empty
     [switch]$Rollback,              # when present, UNDO the scenario
-    [int]$DurationSeconds = 180
+    [int]$DurationSeconds = 180,
+    [string]$HealthPath = '/albums' # healthy 200 endpoint (per-app; e.g. "/" for voting-app)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +34,6 @@ $ErrorActionPreference = 'Stop'
 
 $ScenarioId = 'high-error-rate'
 $FaultPath  = '/__opspilot_fault__'
-$HealthPath = '/albums'
 
 try {
     $url = Resolve-AppUrl -ResourceGroup $ResourceGroup -AppName $AppName -BaseUrl $BaseUrl

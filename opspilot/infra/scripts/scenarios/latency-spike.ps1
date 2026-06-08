@@ -27,14 +27,15 @@ param(
     [string]$AppName = 'album-api',
     [string]$BaseUrl = '',          # resolved from az ingress fqdn if empty
     [switch]$Rollback,              # when present, UNDO the scenario
-    [int]$DurationSeconds = 180
+    [int]$DurationSeconds = 180,
+    [string]$HealthPath = '/albums' # endpoint to load (per-app; e.g. "/" for voting-app)
 )
 
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/_scenario-common.ps1"
 
 $ScenarioId = 'latency-spike'
-$LoadPath   = '/albums'
+$LoadPath   = $HealthPath
 
 try {
     $url = Resolve-AppUrl -ResourceGroup $ResourceGroup -AppName $AppName -BaseUrl $BaseUrl

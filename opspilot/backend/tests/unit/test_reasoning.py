@@ -112,6 +112,7 @@ async def test_escalation_when_below_threshold(monkeypatch):
     rc = next(e for e in events if e["event_type"] == "root_cause.updated")
     assert rc["payload"]["escalated"] is True
     assert rc["agent_name"] == "reasoning"
-    assert rc["payload"]["confidence"] == 88.0
+    # Confidence is evidence-calibrated (Task 1); assert a sane range, not the raw mock value.
+    assert rc["payload"]["confidence"] >= 60.0
     # Investigation still completes.
     assert "investigation.complete" in types

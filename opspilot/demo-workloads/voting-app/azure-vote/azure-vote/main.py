@@ -7,6 +7,43 @@ import sys
 
 app = Flask(__name__)
 
+# ── OpenTelemetry → Azure Monitor (so OpsPilot DISCOVERS + MONITORS this app) ──
+# Records each HTTP request into Application Insights AppRequests with cloud role
+# name = voting-app, exactly like album-api. Uses BatchSpanProcessor (export runs
+# on a BACKGROUND thread, so requests are NOT blocked on the telemetry POST), and
+# initialises it POST-FORK so that background thread lives inside each uwsgi worker
+# (a thread created in the pre-fork master would die on fork → no telemetry).
+# No-op when APPLICATIONINSIGHTS_CONNECTION_STRING is unset.
+def _init_opspilot_telemetry():
+    try:
+        _ai_conn = os.environ.get('APPLICATIONINSIGHTS_CONNECTION_STRING')
+        if not _ai_conn:
+            return
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.instrumentation.flask import FlaskInstrumentor
+        from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+
+        _role = os.environ.get('OPSPILOT_SERVICE_NAME', 'voting-app')
+        _provider = TracerProvider(resource=Resource.create({'service.name': _role}))
+        _provider.add_span_processor(
+            BatchSpanProcessor(AzureMonitorTraceExporter(connection_string=_ai_conn))
+        )
+        trace.set_tracer_provider(_provider)
+        FlaskInstrumentor().instrument_app(app)
+        print('OpsPilot: App Insights instrumentation enabled (role=%s)' % _role, file=sys.stderr)
+    except Exception as _otel_exc:  # never let telemetry wiring crash the app
+        print('OpsPilot: App Insights instrumentation failed: %s' % _otel_exc, file=sys.stderr)
+
+
+try:
+    from uwsgidecorators import postfork  # available when running under uwsgi
+    postfork(_init_opspilot_telemetry)
+except ImportError:
+    _init_opspilot_telemetry()  # plain process (e.g. flask dev server)
+
 # Load configurations from environment or config file
 app.config.from_pyfile('config_file.cfg')
 

@@ -90,7 +90,9 @@ async def test_graph_routes_through_reasoning_when_escalated(monkeypatch):
     # reasoning runs between root_cause and recommendation
     assert completed.index("root_cause") < completed.index("reasoning") < completed.index("recommendation")
     rc = next(e for e in events if e["event_type"] == "root_cause.updated")["payload"]
-    assert rc["escalated"] is True and rc["confidence"] == 88.0
+    # Confidence is evidence-calibrated (Task 1), so assert escalation + a sane range
+    # rather than the raw pre-calibration mock value.
+    assert rc["escalated"] is True and rc["confidence"] >= 60.0
 
 
 @pytest.mark.asyncio

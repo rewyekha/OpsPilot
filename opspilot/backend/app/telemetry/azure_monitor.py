@@ -42,13 +42,11 @@ _ERROR_RATE_UNHEALTHY = 10.0  # %  — failing
 _LATENCY_DEGRADED_MS = 250.0
 _LATENCY_UNHEALTHY_MS = 1000.0
 
-# A workload is "monitored" only if it emitted telemetry within this window.
-# This is the ONLY telemetry-based signal that a service still exists: Log
-# Analytics / Application Insights retain historical rows for the workspace
-# retention period (e.g. 30 days), so a DELETED Container App keeps appearing in
-# `distinct AppRoleName` over a wide window. Scoping discovery to recent activity
-# drops a deleted workload promptly (within this window) instead of for ~24h.
-_DISCOVERY_WINDOW_MIN = 15
+# A workload is "monitored" only if it emitted telemetry within
+# Settings.discovery_window_minutes. Log Analytics retains historical rows for the
+# workspace retention period, so a deleted Container App keeps appearing over a
+# wide window — scoping discovery to recent activity drops a deleted workload, but
+# a wider window keeps an idle-but-live demo app visible (see config).
 
 
 class AzureMonitorTelemetryProvider(TelemetryProvider):
@@ -129,8 +127,10 @@ class AzureMonitorTelemetryProvider(TelemetryProvider):
         Returns [] when Azure has no monitored workloads (drives the dashboard's
         "No monitored Azure services discovered" empty state).
         """
+        from app.config import get_settings
+
         discovered: set[str] = set()
-        win = _DISCOVERY_WINDOW_MIN
+        win = get_settings().discovery_window_minutes
 
         # Source 1 — Application Insights role names (instrumented workloads).
         # Scoped to recent activity so a deleted workload (whose historical rows

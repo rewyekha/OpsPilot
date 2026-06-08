@@ -4,7 +4,7 @@
  * green/active when the background monitor is scanning Azure telemetry.
  */
 import React, { useEffect, useState } from 'react'
-import { makeStyles, tokens } from '@fluentui/react-components'
+import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { systemApi, type MonitorStatus } from '../../api/system'
 import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 
@@ -17,6 +17,16 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   dot: { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0 },
+  // Live "scanning" pulse — a soft expanding ring while the monitor is active.
+  pulse: {
+    animationName: {
+      '0%': { boxShadow: '0 0 0 0 rgba(34,197,94,0.5)' },
+      '70%': { boxShadow: '0 0 0 5px rgba(34,197,94,0)' },
+      '100%': { boxShadow: '0 0 0 0 rgba(34,197,94,0)' },
+    },
+    animationDuration: '1.9s',
+    animationIterationCount: 'infinite',
+  },
 })
 
 export const MonitorBadge: React.FC = () => {
@@ -47,7 +57,7 @@ export const MonitorBadge: React.FC = () => {
       className={s.badge}
       title={m?.last_error ? `last scan error: ${m.last_error}` : 'Background monitor scans Azure telemetry and auto-investigates incidents'}
     >
-      <span className={s.dot} style={{ backgroundColor: color }} />
+      <span className={active ? mergeClasses(s.dot, s.pulse) : s.dot} style={{ backgroundColor: color }} />
       {label}
     </span>
   )

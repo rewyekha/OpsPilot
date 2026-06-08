@@ -111,6 +111,8 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '6px',
     minWidth: 0,
+    transition: 'background-color 140ms ease',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground3 },
   },
   kpiLabel: {
     fontSize: '10px',
@@ -344,6 +346,9 @@ export const RecommendationPanel: React.FC = () => {
             <span className={s.kpiValue} style={{ color: confidenceColor(confidence) }}>
               {Math.round(confidence)}%
             </span>
+          </Kpi>
+          <Kpi label="Recommendations">
+            <span className={s.kpiValue}>{record.recommendations.length || '—'}</span>
           </Kpi>
           <Kpi label="Blast Radius">
             <span className={s.kpiValue}>

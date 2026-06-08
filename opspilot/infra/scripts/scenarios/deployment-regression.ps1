@@ -26,7 +26,8 @@ param(
     [string]$AppName = 'album-api',
     [string]$BaseUrl = '',          # resolved from az ingress fqdn if empty
     [switch]$Rollback,              # when present, UNDO the scenario
-    [int]$DurationSeconds = 180
+    [int]$DurationSeconds = 180,
+    [string]$HealthPath = '/albums' # accepted for a uniform demo interface (unused here)
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,7 +53,7 @@ try {
     if ($Rollback) {
         Write-Step "[$ScenarioId] ROLLBACK — restoring original image"
         $state = Read-ScenarioState -AppName $AppName -ScenarioId $ScenarioId
-        $original = $state?.originalImage
+        $original = if ($state) { $state.originalImage } else { $null }
         if ([string]::IsNullOrWhiteSpace($original)) {
             throw "No captured original image found (state file missing). Cannot safely roll back; redeploy with deploy-album-api.ps1."
         }

@@ -3,17 +3,23 @@ Investigation store — the SINGLE SOURCE OF TRUTH for completed investigations.
 
 Every orchestrator run persists one InvestigationRecord here. History, Analytics,
 the Agents page, and the dashboard's "latest result" all read from this store —
-there are no parallel mock copies. Persistence is a JSON file under backend/data/
-so records survive a frontend refresh AND a backend restart.
+there are no parallel mock copies. Persistence is a SQLite database under
+backend/data/opspilot.db, so records survive a frontend refresh AND a backend
+restart, with proper indexed queries.
 
-This is deliberately dependency-free (stdlib json + a file) — no external DB — so
-it runs anywhere the backend runs. Writes are serialised with an asyncio.Lock.
+Stdlib `sqlite3` only — no external DB server, runs anywhere the backend runs.
+The DB path is overridable via OPSPILOT_DB_PATH (used for isolated tests). A legacy
+data/investigations.json is imported once on first start so existing history is
+never lost.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
+import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +28,10 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
-_FILE = _DATA_DIR / "investigations.json"
-_LOCK = asyncio.Lock()
-_cache: list["InvestigationRecord"] | None = None
+_FILE = _DATA_DIR / "investigations.json"   # legacy JSON (migrated on first start)
+_LOCK = asyncio.Lock()                       # serialises async writers
+_DB_LOCK = threading.Lock()                  # guards the sqlite connection
+_conn: sqlite3.Connection | None = None
 
 
 # ── Record model ──────────────────────────────────────────────────────────────
@@ -59,41 +66,98 @@ class InvestigationRecord(BaseModel):
     agents: list[AgentExecution] = Field(default_factory=list)
 
 
-# ── Persistence ───────────────────────────────────────────────────────────────
+# ── SQLite persistence ────────────────────────────────────────────────────────
 
 
-def _load() -> list[InvestigationRecord]:
-    global _cache
-    if _cache is not None:
-        return _cache
-    records: list[InvestigationRecord] = []
-    try:
-        if _FILE.exists():
-            raw = json.loads(_FILE.read_text(encoding="utf-8"))
-            records = [InvestigationRecord(**r) for r in raw]
-    except Exception:
-        log.exception("investigation_store.load_failed")
-        records = []
-    _cache = records
-    return records
+def _db_path() -> Path:
+    return Path(os.environ.get("OPSPILOT_DB_PATH", str(_DATA_DIR / "opspilot.db")))
 
 
-def _persist(records: list[InvestigationRecord]) -> None:
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = _FILE.with_suffix(".json.tmp")
-    tmp.write_text(
-        json.dumps([r.model_dump() for r in records], indent=2, default=str),
-        encoding="utf-8",
+def _connect() -> sqlite3.Connection:
+    """Lazily open the connection + ensure schema. Cheap on subsequent calls."""
+    global _conn
+    if _conn is None:
+        path = _db_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _conn = sqlite3.connect(str(path), check_same_thread=False)
+        _conn.row_factory = sqlite3.Row
+        _conn.execute("PRAGMA journal_mode=WAL")
+        _conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS investigations (
+                id            TEXT PRIMARY KEY,
+                incident_id   TEXT,
+                started_at    TEXT,
+                completed_at  TEXT,
+                data          TEXT NOT NULL
+            )
+            """
+        )
+        _conn.execute("CREATE INDEX IF NOT EXISTS idx_inv_incident ON investigations(incident_id)")
+        _conn.commit()
+        _migrate_from_json(_conn)
+    return _conn
+
+
+def reset_connection() -> None:
+    """Close the cached connection (re-opened on next use). For tests / path swaps."""
+    global _conn
+    if _conn is not None:
+        try:
+            _conn.close()
+        except Exception:
+            pass
+        _conn = None
+
+
+def _insert(conn: sqlite3.Connection, record: InvestigationRecord) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO investigations (id, incident_id, started_at, completed_at, data) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            record.id,
+            record.incident_id,
+            record.started_at,
+            record.completed_at,
+            json.dumps(record.model_dump(), default=str),
+        ),
     )
-    tmp.replace(_FILE)  # atomic on the same filesystem
+
+
+def _migrate_from_json(conn: sqlite3.Connection) -> None:
+    """One-time import of a legacy investigations.json so existing history survives."""
+    try:
+        if conn.execute("SELECT COUNT(*) FROM investigations").fetchone()[0] > 0:
+            return
+        if not _FILE.exists():
+            return
+        raw = json.loads(_FILE.read_text(encoding="utf-8"))
+        if not raw:
+            return
+        for r in raw:
+            _insert(conn, InvestigationRecord(**r))
+        conn.commit()
+        _FILE.rename(_FILE.with_suffix(".json.migrated"))
+        log.info("investigation_store.migrated_from_json count=%d", len(raw))
+    except Exception:
+        log.exception("investigation_store.migrate_failed")
+
+
+def _row_to_record(row: sqlite3.Row) -> InvestigationRecord:
+    return InvestigationRecord(**json.loads(row["data"]))
+
+
+# newest first, insertion order breaking ties (rowid increments per insert)
+_ORDER = "ORDER BY COALESCE(NULLIF(completed_at, ''), started_at) DESC, rowid DESC"
 
 
 async def add(record: InvestigationRecord) -> None:
-    """Append a completed investigation and persist atomically."""
+    """Persist a completed investigation."""
     async with _LOCK:
-        records = _load()
-        records.append(record)
-        _persist(records)
+        with _DB_LOCK:
+            conn = _connect()
+            _insert(conn, record)
+            conn.commit()
     log.info("investigation_store.added id=%s incident=%s", record.id, record.incident_id)
 
 
@@ -102,20 +166,48 @@ async def add(record: InvestigationRecord) -> None:
 
 def list_all(incident_id: str | None = None) -> list[InvestigationRecord]:
     """All records (optionally for one incident), newest first."""
-    records = _load()
-    if incident_id:
-        records = [r for r in records if r.incident_id == incident_id]
-    return sorted(records, key=lambda r: r.completed_at or r.started_at, reverse=True)
+    with _DB_LOCK:
+        conn = _connect()
+        if incident_id:
+            rows = conn.execute(
+                f"SELECT data FROM investigations WHERE incident_id = ? {_ORDER}", (incident_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute(f"SELECT data FROM investigations {_ORDER}").fetchall()
+    return [_row_to_record(r) for r in rows]
 
 
 def latest(incident_id: str | None = None) -> InvestigationRecord | None:
-    records = list_all(incident_id)
-    return records[0] if records else None
+    with _DB_LOCK:
+        conn = _connect()
+        if incident_id:
+            row = conn.execute(
+                f"SELECT data FROM investigations WHERE incident_id = ? {_ORDER} LIMIT 1", (incident_id,)
+            ).fetchone()
+        else:
+            row = conn.execute(f"SELECT data FROM investigations {_ORDER} LIMIT 1").fetchone()
+    return _row_to_record(row) if row else None
 
 
 def get(run_id: str) -> InvestigationRecord | None:
-    return next((r for r in _load() if r.id == run_id), None)
+    with _DB_LOCK:
+        conn = _connect()
+        row = conn.execute("SELECT data FROM investigations WHERE id = ?", (run_id,)).fetchone()
+    return _row_to_record(row) if row else None
 
 
 def count() -> int:
-    return len(_load())
+    with _DB_LOCK:
+        conn = _connect()
+        return int(conn.execute("SELECT COUNT(*) FROM investigations").fetchone()[0])
+
+
+def clear() -> int:
+    """Delete all stored investigations (clean demo slate). Returns rows removed."""
+    with _DB_LOCK:
+        conn = _connect()
+        n = int(conn.execute("SELECT COUNT(*) FROM investigations").fetchone()[0])
+        conn.execute("DELETE FROM investigations")
+        conn.commit()
+    log.info("investigation_store.cleared count=%d", n)
+    return n

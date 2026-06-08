@@ -16,15 +16,11 @@ import React, { useState } from 'react'
 import { makeStyles, tokens, mergeClasses, Spinner } from '@fluentui/react-components'
 import { ServerRegular, ServerMultipleRegular, OpenRegular } from '@fluentui/react-icons'
 import { useMonitoredServices } from '../../hooks/useMonitoredServices'
+import { useActiveIncidents } from '../../hooks/useActiveIncidents'
 import { useFormatters } from '../../store/PreferencesContext'
 import { EmptyState } from '../shared/EmptyState'
 import { ServiceBlade } from './ServiceBlade'
-import {
-  HEALTH_COLORS,
-  HEALTH_LABELS,
-  asHealth,
-  type HealthKey,
-} from '../../theme/tokens'
+import { deriveServiceStatus, STATUS_STYLE, type DisplayStatus } from '../../theme/serviceStatus'
 import type { ApiServiceHealth } from '../../api/services'
 
 const useStyles = makeStyles({
@@ -163,25 +159,24 @@ const useStyles = makeStyles({
   },
 })
 
-const HealthChip: React.FC<{ status: HealthKey }> = ({ status }) => {
+const StatusChip: React.FC<{ status: DisplayStatus }> = ({ status }) => {
   const s = useStyles()
-  const cfg = HEALTH_COLORS[status]
+  const cfg = STATUS_STYLE[status]
   return (
     <span
       className={s.healthChip}
       style={{ backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.text }}
     >
       <span className={s.dot} style={{ backgroundColor: cfg.color }} />
-      {HEALTH_LABELS[status].toUpperCase()}
+      {status}
     </span>
   )
 }
 
-const ServiceTile: React.FC<{ svc: ApiServiceHealth; onOpen: () => void }> = ({ svc, onOpen }) => {
+const ServiceTile: React.FC<{ svc: ApiServiceHealth; status: DisplayStatus; onOpen: () => void }> = ({ svc, status, onOpen }) => {
   const s = useStyles()
   const fmt = useFormatters()
-  const health = asHealth(svc.status)
-  const cfg = HEALTH_COLORS[health]
+  const cfg = STATUS_STYLE[status]
 
   return (
     <div
@@ -201,7 +196,7 @@ const ServiceTile: React.FC<{ svc: ApiServiceHealth; onOpen: () => void }> = ({ 
         <span className={s.openHint}>Open <OpenRegular fontSize={12} /></span>
       </div>
 
-      <HealthChip status={health} />
+      <StatusChip status={status} />
 
       <div className={s.metrics}>
         <div className={s.metric}>
@@ -226,7 +221,13 @@ const ServiceTile: React.FC<{ svc: ApiServiceHealth; onOpen: () => void }> = ({ 
 export const MonitoredServices: React.FC = () => {
   const s = useStyles()
   const { data, loading, error } = useMonitoredServices()
+  const active = useActiveIncidents()
   const [selected, setSelected] = useState<ApiServiceHealth | null>(null)
+
+  const incidentFor = (name: string) =>
+    (active.data ?? []).find(
+      (i) => (i.affected_services ?? []).includes(name) || i.id === `INC-${name}`,
+    )
 
   return (
     <>
@@ -251,7 +252,12 @@ export const MonitoredServices: React.FC = () => {
       {!loading && !error && data && data.services.length > 0 && (
         <div className={s.grid}>
           {data.services.map((svc) => (
-            <ServiceTile key={svc.name} svc={svc} onOpen={() => setSelected(svc)} />
+            <ServiceTile
+              key={svc.name}
+              svc={svc}
+              status={deriveServiceStatus(svc, incidentFor(svc.name))}
+              onOpen={() => setSelected(svc)}
+            />
           ))}
         </div>
       )}

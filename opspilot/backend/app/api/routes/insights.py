@@ -35,6 +35,13 @@ async def list_investigations(
     return records
 
 
+@router.get("/history", summary="History (alias for /api/investigations)")
+async def history(incident_id: str | None = Query(None)) -> list[InvestigationRecord]:
+    """Alias so GET /api/history works (the canonical route is /api/investigations,
+    which is what the frontend History page calls)."""
+    return investigation_store.list_all(incident_id)
+
+
 @router.get("/investigations/latest", summary="Most recent investigation record")
 async def latest_investigation(
     incident_id: str | None = Query(None),
@@ -49,19 +56,24 @@ def _avg(values: list[float]) -> float:
     return round(sum(values) / len(values), 2) if values else 0.0
 
 
-def _root_cause_category(title: str) -> str:
-    t = (title or "").lower()
+def _root_cause_category(title: str, description: str = "") -> str:
+    """Map a root cause to one of the standard categories (Task 6). Matches on the
+    title + description so real (LLM-authored) root causes land in a meaningful
+    bucket instead of "Other". Most-specific categories are checked first."""
+    t = f"{title or ''} {description or ''}".lower()
     rules = [
-        ("Connection Pool", ("pool", "connection", "orm", "sqlalchemy")),
-        ("Deployment / Config", ("deploy", "config", "regression", "rollout", "version", "migration")),
-        ("Dependency", ("redis", "dependency", "downstream", "gateway", "timeout")),
-        ("Resource / Capacity", ("memory", "cpu", "capacity", "scale", "throttle", "oom")),
-        ("Network", ("network", "dns", "latency", "connectivity")),
+        ("Deployment", ("deploy", "rollout", "revision", "release", "regression", "rollback", "version", "canary", "migration", "ship")),
+        ("Configuration", ("config", "misconfig", "setting", "env var", "environment variable", "parameter", "threshold", "alert logic", "feature flag", "pool size", "connection string")),
+        ("Scaling", ("scale", "replica", "capacity", "throttl", "autoscal", "saturation", "overload", "quota", "resource limit", "concurrency")),
+        ("Network", ("network", "dns", "connectivity", "ingress", "unreachable", "timeout", "latency", "packet", "firewall", "routing", "tls", "certificate")),
+        ("Dependency", ("dependency", "downstream", "upstream", "redis", "database", " db ", "datastore", "gateway", "external", "third-party", "queue", "broker")),
+        ("Infrastructure", ("infrastructure", "container", "node", "host", "pod", "oom", "memory", "cpu", "disk", "restart", "crash", "instance", "runtime", "platform", "kernel")),
+        ("Application", ("application", "code", "bug", "exception", "error rate", "null", "logic", "handler", "endpoint", "request", "5xx", "stack trace", "regex", "validation")),
     ]
     for label, keys in rules:
         if any(k in t for k in keys):
             return label
-    return "Other"
+    return "Application"
 
 
 @router.get("/analytics", summary="Analytics computed from stored investigations")
@@ -90,7 +102,8 @@ async def analytics() -> dict:
     # Root cause categories.
     categories: dict[str, int] = defaultdict(int)
     for r in records:
-        categories[_root_cause_category(r.root_cause.get("title", "") if r.root_cause else "")] += 1
+        rc = r.root_cause or {}
+        categories[_root_cause_category(rc.get("title", ""), rc.get("description", ""))] += 1
 
     # Volume per day (last 7 days).
     today = datetime.now(timezone.utc).date()

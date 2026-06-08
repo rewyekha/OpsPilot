@@ -75,7 +75,14 @@ class Settings(BaseSettings):
     # and AUTO-CREATES + AUTO-INVESTIGATES incidents when thresholds are breached.
     auto_detection_enabled: bool = True
     detection_interval_seconds: int = 30      # how often the monitor scans
-    detection_cooldown_seconds: int = 600     # min gap between auto-runs per incident
+    # Min gap between auto-runs for the SAME incident. 180s lets a demo run several
+    # scenarios on the same service in a session (10 min blocked back-to-back demos).
+    detection_cooldown_seconds: int = 180
+    # A workload counts as "monitored" if it emitted telemetry within this window.
+    # Wider = idle-but-live demo apps stay visible on the dashboard; tighter =
+    # deleted workloads drop off faster. 180 min keeps a service visible across a
+    # demo session after one traffic burst.
+    discovery_window_minutes: int = 180
     # Detection thresholds (telemetry-driven; never fabricated).
     detect_error_rate_warn_pct: float = 5.0   # > this for the window  → P2
     detect_error_rate_crit_pct: float = 20.0  # > this                  → P1

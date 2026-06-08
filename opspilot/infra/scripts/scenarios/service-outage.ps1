@@ -3,13 +3,17 @@
     Demo-failure scenario: SERVICE OUTAGE (id: service-outage).
 
 .DESCRIPTION
-    Captures the container app's current min/max replica counts, then scales the
-    app to zero replicas (--min-replicas 0 --max-replicas 0) so it has no running
-    instances and becomes unreachable — a hard service outage.
+    Takes album-api genuinely OFFLINE by DISABLING its external ingress, so the
+    public endpoint stops responding (a real, immediate, reversible outage).
 
-    The original replica counts are captured into a temp state file BEFORE the
-    mutation so -Rollback restores exactly the previous scale (defaulting to
-    --min-replicas 1 --max-replicas 1 if the originals can't be read).
+    Why not "scale to zero"? `az containerapp update --max-replicas 0` is rejected
+    by Azure (max must be >= 1), and `--min-replicas 0` only *allows* scale-to-zero
+    after a long idle cooldown — the app keeps a replica running and stays healthy.
+    Disabling ingress makes the service unreachable instantly.
+
+    Before cutting ingress, the script seeds ~45s of baseline traffic so the
+    monitor's service-down rule (served in the prior 15m, ZERO in the last 5m) has
+    a baseline to compare against once requests stop. -Rollback re-enables ingress.
 
     Expected OpsPilot reaction: P1 "service down / availability" incident.
 
@@ -24,7 +28,9 @@ param(
     [string]$AppName = 'album-api',
     [string]$BaseUrl = '',          # resolved from az ingress fqdn if empty
     [switch]$Rollback,              # when present, UNDO the scenario
-    [int]$DurationSeconds = 180
+    [int]$DurationSeconds = 180,
+    [int]$TargetPort = 8080,
+    [string]$HealthPath = '/albums' # endpoint for the baseline seed (per-app; e.g. "/")
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,66 +38,51 @@ $ErrorActionPreference = 'Stop'
 
 $ScenarioId = 'service-outage'
 
-# Read current scale rule (min/max replicas) off the live container app.
-function Get-CurrentScale {
-    $min = az containerapp show --name $AppName --resource-group $ResourceGroup `
-        --query properties.template.scale.minReplicas -o tsv 2>$null
-    $max = az containerapp show --name $AppName --resource-group $ResourceGroup `
-        --query properties.template.scale.maxReplicas -o tsv 2>$null
-    return [pscustomobject]@{
-        Min = ([string]::IsNullOrWhiteSpace($min) ? $null : [int]$min)
-        Max = ([string]::IsNullOrWhiteSpace($max) ? $null : [int]$max)
-    }
-}
-
 try {
     Assert-AzLogin | Out-Null
-    $app = Invoke-AzJson @('containerapp', 'show', '--name', $AppName, '-g', $ResourceGroup)
-    if (-not $app) { throw "Container app '$AppName' not found in '$ResourceGroup'." }
 
     if ($Rollback) {
-        Write-Step "[$ScenarioId] ROLLBACK — restoring replica counts"
+        Write-Step "[$ScenarioId] ROLLBACK — re-enabling external ingress"
         $state = Read-ScenarioState -AppName $AppName -ScenarioId $ScenarioId
-        # Fall back to 1/1 if the captured originals are missing or were already zero.
-        $min = $state?.originalMin
-        $max = $state?.originalMax
-        if ($null -eq $min -or [int]$min -le 0) { $min = 1 }
-        if ($null -eq $max -or [int]$max -le 0) { $max = 1 }
-        if ([int]$max -lt [int]$min) { $max = $min }
-        Write-Info "Restoring scale → min=$min max=$max"
-        az containerapp update --name $AppName --resource-group $ResourceGroup `
-            --min-replicas $min --max-replicas $max --only-show-errors | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "az containerapp update (restore scale) failed (exit $LASTEXITCODE)." }
+        $port = if ($state -and $state.targetPort) { [int]$state.targetPort } else { $TargetPort }
+        Write-Info "Restoring external ingress on port $port"
+        az containerapp ingress enable --name $AppName --resource-group $ResourceGroup `
+            --type external --target-port $port --transport auto --only-show-errors | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "az containerapp ingress enable failed (exit $LASTEXITCODE)." }
         Remove-ScenarioState -AppName $AppName -ScenarioId $ScenarioId
-        Write-Ok "[$ScenarioId] scale restored to min=$min max=$max"
+        Write-Ok "[$ScenarioId] ingress re-enabled on port $port — service reachable again"
         Write-ScenarioResult -ScenarioId $ScenarioId -Action 'rollback' -Status 'ok'
         exit 0
     }
 
-    Write-Step "[$ScenarioId] EXECUTE — scaling app to zero replicas (outage)"
-    $scale = Get-CurrentScale
-    Write-Info "Current scale: min=$($scale.Min) max=$($scale.Max)"
-
-    if (($scale.Min -eq 0) -and ($scale.Max -eq 0)) {
-        Write-Warn "[$ScenarioId] app is already scaled to zero — scenario already active (no-op)."
+    Write-Step "[$ScenarioId] EXECUTE — taking the service offline (disable ingress)"
+    # Read the current target port (also confirms the app exists). Empty + exit 0 ⇒
+    # ingress is already disabled.
+    $port = az containerapp show --name $AppName --resource-group $ResourceGroup `
+        --query "properties.configuration.ingress.targetPort" -o tsv 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Container app '$AppName' not found in '$ResourceGroup'." }
+    if ([string]::IsNullOrWhiteSpace($port)) {
+        Write-Warn "[$ScenarioId] ingress already disabled — scenario already active (no-op)."
         Write-ScenarioResult -ScenarioId $ScenarioId -Action 'execute' -Status 'ok'
         exit 0
     }
 
-    # Capture originals; if currently 0 (shouldn't be, handled above), default to 1.
     Save-ScenarioState -AppName $AppName -ScenarioId $ScenarioId -State @{
-        kind        = 'scale-to-zero'
-        originalMin = ($scale.Min ?? 1)
-        originalMax = ($scale.Max ?? 1)
+        kind       = 'disable-ingress'
+        targetPort = [int]$port
     } | Out-Null
 
-    Write-Info 'Updating scale → min=0 max=0 (no running instances → unreachable)'
-    az containerapp update --name $AppName --resource-group $ResourceGroup `
-        --min-replicas 0 --max-replicas 0 --only-show-errors | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "az containerapp update (scale to zero) failed (exit $LASTEXITCODE)." }
+    # Seed recent traffic so the service-down rule has a prior-activity baseline.
+    $url = Resolve-AppUrl -ResourceGroup $ResourceGroup -AppName $AppName -BaseUrl $BaseUrl
+    Write-Info 'Seeding ~45s of baseline traffic so the outage is detectable…'
+    Send-Load -Url "$url$HealthPath" -DurationSeconds 45 -Parallel 15 -Label 'baseline-200' | Out-Null
 
-    Write-Ok "[$ScenarioId] app scaled to zero; original scale (min=$($scale.Min) max=$($scale.Max)) saved for rollback."
-    Write-Info 'Allow ~2-5 min for telemetry ingestion, then OpsPilot should raise a P1 service-down incident.'
+    Write-Info 'Disabling external ingress → service becomes unreachable'
+    az containerapp ingress disable --name $AppName --resource-group $ResourceGroup --only-show-errors | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "az containerapp ingress disable failed (exit $LASTEXITCODE)." }
+
+    Write-Ok "[$ScenarioId] ingress disabled — $AppName is now unreachable (real outage)."
+    Write-Info 'Allow ~5-8 min: once the seeded traffic ages out of the 5-min window, OpsPilot raises a P1 service-down incident.'
     Write-Info "Undo with:  ./service-outage.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -Rollback"
     Write-ScenarioResult -ScenarioId $ScenarioId -Action 'execute' -Status 'ok'
     exit 0

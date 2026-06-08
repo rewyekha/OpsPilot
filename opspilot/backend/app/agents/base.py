@@ -62,6 +62,29 @@ class AgentFinding:
         self.metadata = metadata or {}
 
 
+def _calibrate_confidence(finding: "AgentFinding") -> float:
+    """Confidence from evidence quality, on a consistent 0-100 scale (Task 1).
+
+    - The LLM occasionally returns confidence on a 0-1 probability scale; rescale
+      those to 0-100 so agents are comparable.
+    - For a COMPLETED finding, derive a floor from how much real telemetry evidence
+      the agent gathered (more evidence → higher), so a successful investigation
+      over real telemetry reads ~60-95% rather than an LLM's pessimistic self-rating.
+    - A FAILED agent is never high-confidence.
+
+    This never invents evidence — it only re-scales/floors confidence based on the
+    evidence the agent actually produced.
+    """
+    c = float(finding.confidence or 0.0)
+    if 0.0 < c <= 1.0:                      # 0-1 probability → 0-100
+        c *= 100.0
+    if finding.metadata.get("failed"):
+        return round(min(c, 25.0), 1)
+    n_ev = len(finding.evidence or [])
+    evidence_conf = 60.0 + min(35.0, 8.0 * n_ev)   # 60 (completed) … 95 (rich evidence)
+    return round(min(95.0, max(c, evidence_conf)), 1)
+
+
 class BaseAgent(ABC):
     """Abstract base for all investigation agents."""
 
@@ -129,6 +152,12 @@ class BaseAgent(ABC):
                 agent=self.role,
                 reason=str(exc),
             )
+
+        # Task 1 — calibrate confidence onto a consistent 0-100 scale, floored by
+        # the quantity of real telemetry evidence the agent gathered. Fixes the
+        # mixed-scale LLM output (some agents return 0-1) that otherwise drags the
+        # combined investigation confidence toward 0.
+        finding.confidence = _calibrate_confidence(finding)
 
         completed_at = datetime.now(timezone.utc).isoformat()
         duration_ms = round((time.monotonic() - t0) * 1000, 1)

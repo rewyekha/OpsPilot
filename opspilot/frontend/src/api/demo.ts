@@ -31,12 +31,15 @@ export interface DemoRunAck {
   status: string
 }
 
+const withApp = (path: string, app?: string) =>
+  app ? `${path}?app=${encodeURIComponent(app)}` : path
+
 export const demoApi = {
   list: (): Promise<DemoScenarioList> => apiFetch<DemoScenarioList>('/api/demo/scenarios'),
-  run: (id: string): Promise<DemoRunAck> =>
-    apiPost<DemoRunAck>(`/api/demo/scenarios/${encodeURIComponent(id)}/run`),
-  rollback: (id: string): Promise<DemoRunAck> =>
-    apiPost<DemoRunAck>(`/api/demo/scenarios/${encodeURIComponent(id)}/rollback`),
-  status: (id: string): Promise<DemoRunStatus> =>
-    apiFetch<DemoRunStatus>(`/api/demo/scenarios/${encodeURIComponent(id)}/status`),
+  run: (id: string, app?: string): Promise<DemoRunAck> =>
+    apiPost<DemoRunAck>(withApp(`/api/demo/scenarios/${encodeURIComponent(id)}/run`, app)),
+  rollback: (id: string, app?: string): Promise<DemoRunAck> =>
+    apiPost<DemoRunAck>(withApp(`/api/demo/scenarios/${encodeURIComponent(id)}/rollback`, app)),
+  status: (id: string, app?: string): Promise<DemoRunStatus> =>
+    apiFetch<DemoRunStatus>(withApp(`/api/demo/scenarios/${encodeURIComponent(id)}/status`, app)),
 }
