@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="opsGrad" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <radialGradient id="opsHi" cx="0.34" cy="0.24" r="0.85">
+      <stop stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- hexagon mark (pointy-top, matches the app clip-path) -->
+  <path d="M32 2.5 L58.5 17.75 L58.5 46.25 L32 61.5 L5.5 46.25 L5.5 17.75 Z" fill="url(#opsGrad)"/>
+  <path d="M32 2.5 L58.5 17.75 L58.5 46.25 L32 61.5 L5.5 46.25 L5.5 17.75 Z" fill="url(#opsHi)"/>
+  <!-- monitoring pulse glyph -->
+  <path d="M14 33 H26 L30 23.5 L34 42.5 L38 33 H50" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

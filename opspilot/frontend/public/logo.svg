@@ -1,0 +1,22 @@
+<svg width="260" height="64" viewBox="0 0 260 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="opsGradL" x1="8" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <radialGradient id="opsHiL" cx="0.34" cy="0.24" r="0.85">
+      <stop stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="opsText" x1="74" y1="20" x2="74" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cdd9ea"/>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <path d="M31 4 L55 18 L55 46 L31 60 L7 46 L7 18 Z" fill="url(#opsGradL)"/>
+  <path d="M31 4 L55 18 L55 46 L31 60 L7 46 L7 18 Z" fill="url(#opsHiL)"/>
+  <path d="M15 32.5 H25.5 L29 24 L33 41 L36.5 32.5 H47" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- wordmark -->
+  <text x="74" y="41" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="-0.5" fill="url(#opsText)">OpsPilot</text>
+</svg>
