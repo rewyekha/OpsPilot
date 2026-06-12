@@ -262,7 +262,12 @@ export const MonitoredServices: React.FC = () => {
         </div>
       )}
 
-      <ServiceBlade service={selected} open={selected !== null} onClose={() => setSelected(null)} />
+      <ServiceBlade
+        service={selected}
+        incident={selected ? incidentFor(selected.name) : undefined}
+        open={selected !== null}
+        onClose={() => setSelected(null)}
+      />
     </>
   )
 }

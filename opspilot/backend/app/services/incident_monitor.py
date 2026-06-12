@@ -23,6 +23,7 @@ import time
 
 from app.agents.orchestrator import investigation_active
 from app.config import get_settings
+from app.services import availability, investigation_store
 from app.services.investigation_runner import trigger_investigation
 from app.telemetry.factory import get_telemetry_provider
 
@@ -70,8 +71,10 @@ class IncidentMonitor:
             "enabled": cfg.auto_detection_enabled,
             "running": bool(self._task and not self._task.done()),
             "telemetry_mode": cfg.telemetry_mode,
+            "demo_safe_mode": cfg.demo_safe_mode,
             "interval_seconds": cfg.detection_interval_seconds,
             "cooldown_seconds": cfg.detection_cooldown_seconds,
+            "forced_outages": availability.down_services(),
             "tracked_incidents": sorted(self._handled.keys()),
             "dispatched_total": self._dispatched_total,
             "last_scan_age_seconds": round(time.monotonic() - self._last_scan, 1) if self._last_scan else None,
@@ -109,7 +112,27 @@ class IncidentMonitor:
         provider = get_telemetry_provider()
         # detect_incidents runs blocking KQL — offload so the loop stays responsive.
         detected = await asyncio.to_thread(provider.detect_incidents)
-        if not detected:
+
+        # Unify two detection sources into one candidate list (incident_id → desc,
+        # services, severity, signal), deduped by incident_id:
+        #   1. telemetry-detected anomalies (real KQL thresholds), and
+        #   2. forced-outage ground truth (a service the control plane took offline
+        #      via the Service Outage scenario). (2) needs no ingestion lag, so the
+        #      outage incident is raised on the very next scan — and it works even in
+        #      synthetic mode where (1) returns nothing.
+        candidates: dict[str, dict] = {}
+        for d in detected:
+            candidates[f"INC-{d.service}"] = {
+                "desc": d.summary or d.title, "services": [d.service],
+                "severity": d.severity, "signal": d.signal,
+            }
+        for svc in availability.down_services():
+            candidates.setdefault(f"INC-{svc}", {
+                "desc": f"{svc}: service down — endpoint unreachable (outage detected).",
+                "services": [svc], "severity": "P1", "signal": "service_down",
+            })
+
+        if not candidates:
             return
 
         now = time.monotonic()
@@ -117,19 +140,25 @@ class IncidentMonitor:
         # Drop long-expired cooldown entries.
         self._handled = {k: v for k, v in self._handled.items() if now - v < cooldown * 3}
 
-        for d in detected:
-            incident_id = f"INC-{d.service}"
+        demo_safe = cfg.demo_safe_mode
+        for incident_id, c in candidates.items():
             if investigation_active(incident_id):
+                continue
+            # DEMO SAFE MODE: once an incident has a persisted investigation, never
+            # auto-re-investigate it — one incident → one investigation, no surprise
+            # re-runs during a presentation. Durable across restarts (store-backed).
+            if demo_safe and investigation_store.latest(incident_id) is not None:
+                self._handled[incident_id] = now   # keep it tracked / out of churn
                 continue
             last = self._handled.get(incident_id)
             if last is not None and (now - last) < cooldown:
                 continue
-            status = trigger_investigation(incident_id, d.summary or d.title, [d.service])
+            status = trigger_investigation(incident_id, c["desc"], c["services"])
             self._handled[incident_id] = now
             self._dispatched_total += 1
             log.info(
                 "incident_monitor.dispatched incident_id=%s severity=%s signal=%s status=%s",
-                incident_id, d.severity, d.signal, status,
+                incident_id, c["severity"], c["signal"], status,
             )
 
 

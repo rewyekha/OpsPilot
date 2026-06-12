@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     # Min gap between auto-runs for the SAME incident. 180s lets a demo run several
     # scenarios on the same service in a session (10 min blocked back-to-back demos).
     detection_cooldown_seconds: int = 180
+    # DEMO SAFE MODE (default ON). When enabled, the autonomous monitor will NEVER
+    # re-investigate an incident that ALREADY has a persisted investigation record:
+    # one incident → exactly one investigation for the whole presentation, with no
+    # surprise re-runs mid-demo. Stronger and more durable than the cooldown (it is
+    # backed by the SQLite store, so it survives a backend restart). Set
+    # DEMO_SAFE_MODE=false to restore continuous re-investigation of ongoing incidents.
+    demo_safe_mode: bool = True
     # A workload counts as "monitored" if it emitted telemetry within this window.
     # Wider = idle-but-live demo apps stay visible on the dashboard; tighter =
     # deleted workloads drop off faster. 180 min keeps a service visible across a

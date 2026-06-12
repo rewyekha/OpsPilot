@@ -14,7 +14,6 @@ import { DemoScenariosPanel } from '../demo/DemoScenariosPanel'
 import { ErrorBoundary } from '../shared/ErrorBoundary'
 import { useNotify } from '../../store/NotificationContext'
 import { usePreferences } from '../../store/PreferencesContext'
-import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 
 export const PAGE_LABELS: Record<string, string> = {
   home:      'Dashboard',
@@ -27,8 +26,12 @@ export const PAGE_LABELS: Record<string, string> = {
 }
 
 // Silent autonomous-update cadence: dispatches `opspilot:poll` so data hooks
-// re-fetch (no remount / no toast). Lets auto-detected incidents appear live.
-const POLL_INTERVAL_MS = 5000
+// re-fetch (no remount / no toast). This poll ONLY surfaces slow-changing data —
+// newly auto-detected incidents, monitor status, demo-scenario status. The ACTIVE
+// investigation updates in real time over SSE (useLiveInvestigation), independent
+// of this interval, so 15s keeps the dashboard live while cutting backend/Azure
+// load (and the per-service KQL the /active poll drives) ~3× versus the old 5s.
+const POLL_INTERVAL_MS = 15000
 
 const useStyles = makeStyles({
   root: {
@@ -91,36 +94,28 @@ const useStyles = makeStyles({
 
 export const AppShell: React.FC = () => {
   const styles = useStyles()
-  useMountLog('AppShell') // TEMP-DEBUG
   const notify = useNotify()
   const [isNavCollapsed, setIsNavCollapsed] = useState(false)
   const [activePage, setActivePage] = useState('home')
   const { autoRefreshSeconds } = usePreferences()
-  // Bumping this remounts the active panel, which re-runs its data hooks —
-  // i.e. a real refresh of agent statuses, confidence, and timeline.
-  const [refreshNonce, setRefreshNonce] = useState(0)
 
+  // BACKGROUND refresh — no remount, no full-page spinner. The data hooks all
+  // listen for `opspilot:refresh` / `opspilot:poll` and refetch in place (SWR:
+  // they keep the current view and swap in fresh data when it arrives). Previously
+  // this bumped a `key` to REMOUNT the active panel, which re-entered every hook's
+  // loading state and flashed a full-dashboard spinner on each refresh.
   const handleRefresh = useCallback(() => {
-    setRefreshNonce((n) => n + 1)
-    notify({ title: 'Refreshing analysis', body: 'Re-running agent investigation…', intent: 'info' })
+    window.dispatchEvent(new Event('opspilot:refresh'))
+    notify({ title: 'Refreshing', body: 'Updating dashboard…', intent: 'info' })
   }, [notify])
 
-  // Auto-refresh: silently remount the active panel on the configured cadence
-  // (Settings → General → Auto refresh interval). 0 = off.
+  // Auto-refresh (Settings → General → Auto refresh interval; 0 = off). Silent
+  // background poll on the configured cadence — never a remount.
   useEffect(() => {
     if (!autoRefreshSeconds) return
-    const id = window.setInterval(() => setRefreshNonce((n) => n + 1), autoRefreshSeconds * 1000)
+    const id = window.setInterval(() => window.dispatchEvent(new Event('opspilot:poll')), autoRefreshSeconds * 1000)
     return () => window.clearInterval(id)
   }, [autoRefreshSeconds])
-
-  // Decoupled refresh trigger: any component can dispatch `opspilot:refresh`
-  // (e.g. the incident actions menu's "Re-run Investigation") to remount the
-  // active panel and re-run its data hooks.
-  useEffect(() => {
-    const onRefresh = () => handleRefresh()
-    window.addEventListener('opspilot:refresh', onRefresh)
-    return () => window.removeEventListener('opspilot:refresh', onRefresh)
-  }, [handleRefresh])
 
   // Autonomous real-time updates: a silent periodic poll so the dashboard,
   // active incidents, history, analytics and agents reflect monitor-created
@@ -155,10 +150,10 @@ export const AppShell: React.FC = () => {
           onNavigate={setActivePage}
         />
         <main className={styles.main}>
-          {/* key forces a remount on refresh so data hooks re-fetch.
-              ErrorBoundary keeps a page crash from blanking the shell; it
-              resets when the active page changes (resetKey). */}
-          <div className={styles.pageContent} key={refreshNonce}>
+          {/* No remount-on-refresh: data hooks refetch in place (SWR) so refresh
+              never blanks the page. ErrorBoundary keeps a page crash from blanking
+              the shell; it resets when the active page changes (resetKey). */}
+          <div className={styles.pageContent}>
             <ErrorBoundary resetKey={activePage}>
               {activePage === 'incidents'
                 ? <IncidentPanel />

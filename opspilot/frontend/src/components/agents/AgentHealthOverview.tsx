@@ -8,15 +8,16 @@
 import React, { useMemo, useState } from 'react'
 import {
   makeStyles, tokens, Table, TableHeader, TableHeaderCell, TableRow, TableBody,
-  TableCell, TableCellLayout, Spinner,
+  TableCell, TableCellLayout, Spinner, Tooltip,
 } from '@fluentui/react-components'
-import { BotRegular } from '@fluentui/react-icons'
+import { BotRegular, InfoRegular } from '@fluentui/react-icons'
 import { useAgentStats } from '../../hooks/useInsights'
 import { useLatestInvestigation } from '../../hooks/useInsights'
 import { AgentBlade, type AgentLike } from './AgentBlade'
 import { EmptyState } from '../shared/EmptyState'
 import { confidenceColor } from '../../theme/tokens'
 import { formatDuration } from '../../utils/formatters'
+import { AGENT_DESCRIPTIONS } from '../../utils/constants'
 import { useFormatters } from '../../store/PreferencesContext'
 
 const useStyles = makeStyles({
@@ -28,6 +29,8 @@ const useStyles = makeStyles({
   statValue: { fontSize: '22px', fontWeight: 700, color: tokens.colorNeutralForeground1, letterSpacing: '-0.4px' },
   card: { backgroundColor: tokens.colorNeutralBackground2, border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: '8px', overflow: 'hidden' },
   row: { cursor: 'pointer', ':hover': { backgroundColor: tokens.colorNeutralBackground3 } },
+  agentName: { display: 'inline-flex', alignItems: 'center', gap: '6px' },
+  info: { fontSize: '14px', color: tokens.colorNeutralForeground4, cursor: 'help', flexShrink: 0, ':hover': { color: tokens.colorNeutralForeground2 } },
   num: { fontVariantNumeric: 'tabular-nums' },
   center: { display: 'flex', justifyContent: 'center', padding: '32px' },
 })
@@ -104,7 +107,24 @@ export const AgentHealthOverview: React.FC = () => {
             {stats.map((a) => (
               <TableRow key={a.role} className={s.row} tabIndex={0} onClick={() => openAgent(a.role)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openAgent(a.role) }}>
-                <TableCell><TableCellLayout>{a.role_label}</TableCellLayout></TableCell>
+                <TableCell>
+                  <TableCellLayout>
+                    <span className={s.agentName}>
+                      {a.role_label}
+                      {AGENT_DESCRIPTIONS[a.role] && (
+                        <Tooltip content={AGENT_DESCRIPTIONS[a.role]} relationship="description" withArrow>
+                          <InfoRegular
+                            className={s.info}
+                            tabIndex={0}
+                            aria-label={`About the ${a.role_label} agent`}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                        </Tooltip>
+                      )}
+                    </span>
+                  </TableCellLayout>
+                </TableCell>
                 <TableCell className={s.num}>{a.execution_count}</TableCell>
                 <TableCell className={s.num}>{a.avg_duration_seconds ? formatDuration(a.avg_duration_seconds) : '—'}</TableCell>
                 <TableCell className={s.num} style={{ color: confidenceColor(a.avg_confidence) }}>{Math.round(a.avg_confidence)}%</TableCell>

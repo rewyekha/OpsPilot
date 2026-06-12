@@ -76,6 +76,7 @@ export function useActiveSnapshot(): ActiveSnapshot {
         : [],
       jobs: Object.values(jobs),
       sessionEvents: timelineEvents,
+      combinedConfidence: record?.combined_confidence,
       generatedAt: new Date().toISOString(),
     }),
     [record, incidentId, incidentStatus, jobs, timelineEvents],

@@ -1,0 +1,407 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3030 1600" font-family="'Segoe UI', 'Segoe UI Variable', system-ui, -apple-system, sans-serif">
+  <title>OpsPilot – Autonomous Incident Intelligence Platform</title>
+  <desc>Microsoft-style enterprise architecture diagram: telemetry pipeline, autonomous detection, parallel multi-agent investigation swarm, confidence decision gateway, intelligence engine, persistence, and command center.</desc>
+
+  <defs>
+    <!-- ===== Gradients ===== -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1f40"/>
+      <stop offset="0.55" stop-color="#081729"/>
+      <stop offset="1" stop-color="#050f1d"/>
+    </linearGradient>
+    <radialGradient id="swarmGlowRadial" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2470c8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#2470c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="topGlow" cx="0.5" cy="0" r="0.8">
+      <stop offset="0" stop-color="#1b4f93" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#1b4f93" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#173353"/>
+      <stop offset="1" stop-color="#0f2138"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c3a5c"/>
+      <stop offset="1" stop-color="#132b47"/>
+    </linearGradient>
+    <linearGradient id="swarm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c4474"/>
+      <stop offset="1" stop-color="#112c50"/>
+    </linearGradient>
+    <linearGradient id="agent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#21466f"/>
+      <stop offset="1" stop-color="#16304d"/>
+    </linearGradient>
+    <linearGradient id="agentDeep" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#332c66"/>
+      <stop offset="1" stop-color="#221a45"/>
+    </linearGradient>
+    <linearGradient id="pipeline" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2db4ea"/>
+      <stop offset="1" stop-color="#1279b8"/>
+    </linearGradient>
+    <linearGradient id="engine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#163457"/>
+      <stop offset="1" stop-color="#0f2338"/>
+    </linearGradient>
+    <linearGradient id="foundry" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c2356"/>
+      <stop offset="1" stop-color="#1a1335"/>
+    </linearGradient>
+    <linearGradient id="diamond" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd57a"/>
+      <stop offset="1" stop-color="#f2a838"/>
+    </linearGradient>
+    <linearGradient id="sev" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4923f"/>
+      <stop offset="1" stop-color="#db5a2b"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13294d"/>
+      <stop offset="1" stop-color="#0c1a31"/>
+    </linearGradient>
+    <linearGradient id="callout" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15315c"/>
+      <stop offset="1" stop-color="#0f213c"/>
+    </linearGradient>
+
+    <!-- ===== Filters ===== -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="cardShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#3a8fe6" flood-opacity="0.7"/>
+    </filter>
+
+    <!-- ===== Arrow markers ===== -->
+    <marker id="aBlue" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#4f9cff"/></marker>
+    <marker id="aCyan" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#3fc8f0"/></marker>
+    <marker id="aGreen" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#56d49a"/></marker>
+    <marker id="aAmber" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#f5b14a"/></marker>
+    <marker id="aViolet" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#9d8cf5"/></marker>
+    <marker id="aSlate" viewBox="0 0 12 12" refX="9.5" refY="6" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 z" fill="#7fa8d8"/></marker>
+
+    <!-- ===== Icon symbols (currentColor) ===== -->
+    <symbol id="icoContainer" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><rect x="9" y="11" width="30" height="26" rx="3"/><line x1="9" y1="20" x2="39" y2="20"/><line x1="17" y1="27" x2="31" y2="27"/><line x1="17" y1="32" x2="31" y2="32"/></g></symbol>
+    <symbol id="icoInsights" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><rect x="8" y="9" width="32" height="30" rx="4"/><path d="M13 26 H19 L23 16 L28 33 L31 26 H36"/></g></symbol>
+    <symbol id="icoLogA" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M12 10 H30 L36 16 V38 H12 Z"/><line x1="16" y1="22" x2="28" y2="22"/><line x1="16" y1="27" x2="32" y2="27"/><circle cx="30" cy="33" r="4.5"/><line x1="33.5" y1="36.5" x2="37" y2="40"/></g></symbol>
+    <symbol id="icoMetrics" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><line x1="9" y1="39" x2="39" y2="39"/><rect x="12" y="26" width="6" height="11"/><rect x="21" y="19" width="6" height="18"/><rect x="30" y="13" width="6" height="24"/></g></symbol>
+    <symbol id="icoFoundry" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M24 6 L40 15 V33 L24 42 L8 33 V15 Z"/><circle cx="24" cy="24" r="5.5"/><path d="M24 6 V18.5 M40 15 L29 21 M8 15 L19 21 M24 42 V29.5"/></g></symbol>
+    <symbol id="icoDb" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><ellipse cx="24" cy="12" rx="15" ry="6"/><path d="M9 12 V36 C9 39.3 15.7 42 24 42 C32.3 42 39 39.3 39 36 V12"/><path d="M9 24 C9 27.3 15.7 30 24 30 C32.3 30 39 27.3 39 24"/></g></symbol>
+    <symbol id="icoDash" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2.5"/><rect x="26" y="9" width="13" height="13" rx="2.5"/><rect x="9" y="26" width="13" height="13" rx="2.5"/><rect x="26" y="26" width="13" height="13" rx="2.5"/></g></symbol>
+    <symbol id="icoUsers" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><circle cx="18" cy="18" r="6"/><circle cx="32" cy="20" r="5"/><path d="M8 38 C8 30 13 27 18 27 C23 27 28 30 28 38"/><path d="M29 38 C29 32 33 29 37 29 C40 29 42 31 42 35"/></g></symbol>
+    <symbol id="icoPipeline" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M10 14 L20 24 L10 34"/><path d="M22 14 L32 24 L22 34"/></g></symbol>
+
+    <!-- agent icons -->
+    <symbol id="agCommander" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M24 7 L28.5 18.5 L40 21 L31 29 L33 41 L24 35 L15 41 L17 29 L8 21 L19.5 18.5 Z"/></g></symbol>
+    <symbol id="agMetrics" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><path d="M9 33 L19 23 L26 29 L39 14"/><path d="M31 14 H39 V22"/></g></symbol>
+    <symbol id="agLogs" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><rect x="12" y="8" width="24" height="32" rx="3"/><line x1="17" y1="17" x2="31" y2="17"/><line x1="17" y1="24" x2="31" y2="24"/><line x1="17" y1="31" x2="26" y2="31"/></g></symbol>
+    <symbol id="agDeploy" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M24 6 C31 13 32 24 27 33 H21 C16 24 17 13 24 6 Z"/><circle cx="24" cy="19" r="3.6"/><path d="M21 33 L16 40 M27 33 L32 40"/></g></symbol>
+    <symbol id="agTime" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><circle cx="24" cy="25" r="15"/><path d="M24 16 V25 L31 29"/><path d="M11 13 L8 10 M37 13 L40 10"/></g></symbol>
+    <symbol id="agRoot" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><circle cx="24" cy="24" r="14"/><circle cx="24" cy="24" r="7"/><circle cx="24" cy="24" r="1.6" fill="currentColor"/><path d="M24 6 V12 M24 36 V42 M6 24 H12 M36 24 H42"/></g></symbol>
+    <symbol id="agRec" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M24 8 C31 8 36 13 36 20 C36 25 33 28 31 31 H17 C15 28 12 25 12 20 C12 13 17 8 24 8 Z"/><line x1="19" y1="36" x2="29" y2="36"/><line x1="21" y1="40" x2="27" y2="40"/></g></symbol>
+    <symbol id="agDeep" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><circle cx="24" cy="24" r="5"/><circle cx="11" cy="14" r="3"/><circle cx="37" cy="14" r="3"/><circle cx="12" cy="36" r="3"/><circle cx="36" cy="36" r="3"/><path d="M19.5 21 L13.5 16 M28.5 21 L34.5 16 M20 28 L14.5 33.5 M28 28 L33.5 33.5"/></g></symbol>
+  </defs>
+
+  <!-- ===== Background ===== -->
+  <rect x="0" y="0" width="3030" height="1600" fill="url(#bg)"/>
+  <rect x="0" y="0" width="3030" height="700" fill="url(#topGlow)"/>
+  <ellipse cx="1402" cy="560" rx="640" ry="560" fill="url(#swarmGlowRadial)"/>
+
+  <!-- ===== Title ===== -->
+  <text x="1515" y="78" text-anchor="middle" font-size="50" font-weight="700" fill="#eaf3ff" letter-spacing="0.5">OpsPilot &#8211; Autonomous Incident Intelligence Platform</text>
+  <text x="1515" y="116" text-anchor="middle" font-size="21" font-weight="400" fill="#7fa8d8" letter-spacing="3">AUTONOMOUS SRE COMMAND CENTER &#183; AZURE AI FOUNDRY &#183; MULTI-AGENT REASONING</text>
+  <line x1="1165" y1="134" x2="1865" y2="134" stroke="#2c5184" stroke-width="2"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 1 — PRODUCTION ENVIRONMENT                            -->
+  <!-- ============================================================= -->
+  <rect x="38" y="160" width="438" height="500" rx="18" fill="#0d1f3a" fill-opacity="0.55" stroke="#22416e" stroke-width="1.5" stroke-dasharray="2 7"/>
+  <text x="58" y="192" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2.5">PRODUCTION ENVIRONMENT</text>
+
+  <g filter="url(#cardShadow)">
+    <rect x="56" y="206" width="338" height="92" rx="12" fill="url(#card)" stroke="#2f5688" stroke-width="1.5"/>
+    <use href="#icoContainer" x="74" y="230" width="44" height="44" style="color:#4db8ff"/>
+    <text x="130" y="244" font-size="20" font-weight="600" fill="#eaf3ff">Azure Container Apps</text>
+    <text x="130" y="272" font-size="15" fill="#8fb0d6">album-api &#183; production workload</text>
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="56" y="312" width="338" height="92" rx="12" fill="url(#card)" stroke="#2f5688" stroke-width="1.5"/>
+    <use href="#icoInsights" x="74" y="336" width="44" height="44" style="color:#5fd0ef"/>
+    <text x="130" y="350" font-size="20" font-weight="600" fill="#eaf3ff">Azure Application Insights</text>
+    <text x="130" y="378" font-size="15" fill="#8fb0d6">traces &#183; dependencies &#183; failures</text>
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="56" y="418" width="338" height="92" rx="12" fill="url(#card)" stroke="#2f5688" stroke-width="1.5"/>
+    <use href="#icoLogA" x="74" y="442" width="44" height="44" style="color:#5fd0ef"/>
+    <text x="130" y="456" font-size="20" font-weight="600" fill="#eaf3ff">Azure Log Analytics</text>
+    <text x="130" y="484" font-size="15" fill="#8fb0d6">KQL logs &#183; error signals</text>
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="56" y="524" width="338" height="92" rx="12" fill="url(#card)" stroke="#2f5688" stroke-width="1.5"/>
+    <use href="#icoMetrics" x="74" y="548" width="44" height="44" style="color:#4db8ff"/>
+    <text x="130" y="562" font-size="20" font-weight="600" fill="#eaf3ff">Azure Monitor Metrics</text>
+    <text x="130" y="590" font-size="15" fill="#8fb0d6">CPU &#183; latency &#183; error rate</text>
+  </g>
+
+  <!-- Telemetry pipeline rail -->
+  <g filter="url(#cardShadow)">
+    <rect x="408" y="206" width="52" height="410" rx="26" fill="url(#pipeline)" stroke="#7fe0ff" stroke-width="1.5"/>
+  </g>
+  <use href="#icoPipeline" x="412" y="224" width="44" height="44" style="color:#062a3f"/>
+  <text x="434" y="540" transform="rotate(-90 434 540)" text-anchor="middle" font-size="16" font-weight="700" fill="#04293c" letter-spacing="2">REAL-TIME TELEMETRY PIPELINE</text>
+  <line x1="394" y1="252" x2="406" y2="262" stroke="#3fc8f0" stroke-width="2.5" marker-end="url(#aCyan)"/>
+  <line x1="394" y1="358" x2="406" y2="330" stroke="#3fc8f0" stroke-width="2.5" marker-end="url(#aCyan)"/>
+  <line x1="394" y1="464" x2="406" y2="430" stroke="#3fc8f0" stroke-width="2.5" marker-end="url(#aCyan)"/>
+  <line x1="394" y1="570" x2="406" y2="540" stroke="#3fc8f0" stroke-width="2.5" marker-end="url(#aCyan)"/>
+  <path d="M460 470 H516" fill="none" stroke="#3fc8f0" stroke-width="3.5" marker-end="url(#aCyan)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 2 — AUTONOMOUS DETECTION LAYER                        -->
+  <!-- ============================================================= -->
+  <text x="520" y="192" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2.5">AUTONOMOUS DETECTION LAYER</text>
+  <g filter="url(#cardShadow)">
+    <rect x="520" y="320" width="362" height="492" rx="16" fill="url(#panel)" stroke="#3a6299" stroke-width="2"/>
+  </g>
+  <text x="546" y="362" font-size="22" font-weight="700" fill="#eaf3ff">OpsPilot Incident Monitor</text>
+  <text x="546" y="386" font-size="14" fill="#8fb0d6">continuous background scan</text>
+  <g font-size="18" font-weight="600" fill="#dbe8fb">
+    <rect x="544" y="400" width="314" height="68" rx="10" fill="#16335a" stroke="#2f5688" stroke-width="1.3"/>
+    <circle cx="572" cy="434" r="5" fill="#4db8ff"/><text x="592" y="440">Telemetry Threshold Engine</text>
+    <rect x="544" y="478" width="314" height="68" rx="10" fill="#16335a" stroke="#2f5688" stroke-width="1.3"/>
+    <circle cx="572" cy="512" r="5" fill="#4db8ff"/><text x="592" y="518">Anomaly Detection</text>
+    <rect x="544" y="556" width="314" height="68" rx="10" fill="#16335a" stroke="#2f5688" stroke-width="1.3"/>
+    <circle cx="572" cy="590" r="5" fill="#4db8ff"/><text x="592" y="596">Incident Creation Engine</text>
+    <rect x="544" y="634" width="314" height="68" rx="10" fill="#16335a" stroke="#2f5688" stroke-width="1.3"/>
+    <circle cx="572" cy="668" r="5" fill="#4db8ff"/><text x="592" y="674">Severity Classification</text>
+  </g>
+  <path d="M882 560 H904" fill="none" stroke="#f5b14a" stroke-width="3.5" marker-end="url(#aAmber)"/>
+
+  <!-- Severity output pill -->
+  <g filter="url(#cardShadow)">
+    <rect x="906" y="512" width="150" height="96" rx="16" fill="url(#sev)" stroke="#ffcaa0" stroke-width="1.5"/>
+  </g>
+  <text x="981" y="556" text-anchor="middle" font-size="24" font-weight="800" fill="#2a1003" letter-spacing="1">P1 / P2 / P3</text>
+  <text x="981" y="585" text-anchor="middle" font-size="16" font-weight="700" fill="#3a1606" letter-spacing="3">INCIDENT</text>
+  <path d="M1056 560 H1086" fill="none" stroke="#f5b14a" stroke-width="3.5" marker-end="url(#aAmber)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 3 — MULTI-AGENT INVESTIGATION SWARM (innovation)      -->
+  <!-- ============================================================= -->
+  <rect x="1090" y="178" width="624" height="782" rx="26" fill="none" stroke="#3a93ea" stroke-width="10" opacity="0.55" filter="url(#softGlow)"/>
+  <rect x="1090" y="178" width="624" height="782" rx="26" fill="url(#swarm)" stroke="#5aa6ee" stroke-width="2.5"/>
+  <rect x="1090" y="178" width="624" height="60" rx="26" fill="#3a93ea" fill-opacity="0.16"/>
+  <text x="1402" y="216" text-anchor="middle" font-size="22" font-weight="800" fill="#cfe6ff" letter-spacing="1.5" filter="url(#textGlow)">PARALLEL AI INVESTIGATION SWARM</text>
+  <text x="1402" y="240" text-anchor="middle" font-size="13.5" fill="#9fc4ee" letter-spacing="1">8 independent agents &#183; run concurrently &#183; innovation core</text>
+
+  <g>
+    <rect x="1110" y="262" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agCommander" x="1126" y="278" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1366" y="300" text-anchor="end" font-size="11.5" font-weight="700" fill="#76a8da" letter-spacing="1.5">ORCHESTRATOR</text>
+    <text x="1128" y="346" font-size="19" font-weight="700" fill="#eaf3ff">Commander Agent</text>
+    <text x="1128" y="372" font-size="13.5" fill="#9bbbdd">Coordinates &amp; synthesizes the investigation</text>
+
+    <rect x="1402" y="262" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agMetrics" x="1418" y="278" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1420" y="346" font-size="19" font-weight="700" fill="#eaf3ff">Metrics Agent</text>
+    <text x="1420" y="372" font-size="13.5" fill="#9bbbdd">Azure metrics, anomalies &amp; trends</text>
+
+    <rect x="1110" y="402" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agLogs" x="1126" y="418" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1128" y="486" font-size="19" font-weight="700" fill="#eaf3ff">Logs Agent</text>
+    <text x="1128" y="512" font-size="13.5" fill="#9bbbdd">Logs, traces &amp; error signals</text>
+
+    <rect x="1402" y="402" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agDeploy" x="1418" y="418" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1420" y="486" font-size="19" font-weight="700" fill="#eaf3ff">Deployment Agent</text>
+    <text x="1420" y="512" font-size="13.5" fill="#9bbbdd">Revisions &amp; config changes</text>
+
+    <rect x="1110" y="542" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agTime" x="1126" y="558" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1128" y="626" font-size="19" font-weight="700" fill="#eaf3ff">Time Machine Agent</text>
+    <text x="1128" y="652" font-size="13.5" fill="#9bbbdd">Reconstructs causal timeline</text>
+
+    <rect x="1402" y="542" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agRoot" x="1418" y="558" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1420" y="626" font-size="19" font-weight="700" fill="#eaf3ff">Root Cause Agent</text>
+    <text x="1420" y="652" font-size="13.5" fill="#9bbbdd">Correlates evidence into a cause</text>
+
+    <rect x="1110" y="682" width="272" height="128" rx="14" fill="url(#agent)" stroke="#3f81c8" stroke-width="1.6"/>
+    <use href="#agRec" x="1126" y="698" width="34" height="34" style="color:#7fd0ff"/>
+    <text x="1128" y="766" font-size="19" font-weight="700" fill="#eaf3ff">Recommendation Agent</text>
+    <text x="1128" y="792" font-size="13.5" fill="#9bbbdd">Ranked remediation actions</text>
+
+    <rect x="1402" y="682" width="272" height="128" rx="14" fill="url(#agentDeep)" stroke="#9d8cf5" stroke-width="2"/>
+    <use href="#agDeep" x="1418" y="698" width="34" height="34" style="color:#c7b8ff"/>
+    <text x="1658" y="720" text-anchor="end" font-size="11.5" font-weight="700" fill="#b3a4f2" letter-spacing="1.2">ESCALATION</text>
+    <text x="1420" y="766" font-size="19" font-weight="700" fill="#f0ecff">Deep Reasoning Agent</text>
+    <text x="1420" y="792" font-size="13.5" fill="#bdb0ee">Advanced multi-step reasoning</text>
+  </g>
+
+  <rect x="1110" y="838" width="564" height="58" rx="12" fill="#0f2747" stroke="#3f81c8" stroke-width="1.4"/>
+  <text x="1392" y="874" text-anchor="middle" font-size="18" font-weight="700" fill="#bcd8ff" letter-spacing="2">EVIDENCE COLLECTION &amp; CORRELATION</text>
+
+  <!-- swarm -> gateway -->
+  <path d="M1714 560 H1742" fill="none" stroke="#4f9cff" stroke-width="3.5" marker-end="url(#aBlue)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 4 — CONFIDENCE DECISION GATEWAY                       -->
+  <!-- ============================================================= -->
+  <text x="1856" y="424" text-anchor="middle" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2">CONFIDENCE DECISION GATEWAY</text>
+  <g filter="url(#cardShadow)">
+    <polygon points="1856,452 1976,560 1856,668 1736,560" fill="url(#diamond)" stroke="#ffe7af" stroke-width="2.5"/>
+  </g>
+  <text x="1856" y="552" text-anchor="middle" font-size="21" font-weight="800" fill="#241303">Confidence</text>
+  <text x="1856" y="582" text-anchor="middle" font-size="21" font-weight="800" fill="#241303">&#8805; 80% ?</text>
+
+  <!-- YES branch -> intelligence -->
+  <path d="M1976 560 H2158" fill="none" stroke="#56d49a" stroke-width="3.5" marker-end="url(#aGreen)"/>
+  <text x="2068" y="540" text-anchor="middle" font-size="14" font-weight="700" fill="#82d9b2">Proceed to Root Cause</text>
+  <rect x="2040" y="547" width="56" height="26" rx="13" fill="#123b2c" stroke="#56d49a" stroke-width="1.4"/>
+  <text x="2068" y="565" text-anchor="middle" font-size="15" font-weight="800" fill="#67e2a8">YES</text>
+
+  <!-- NO branch -> foundry -->
+  <path d="M1856 668 V726" fill="none" stroke="#f5b14a" stroke-width="3.5" marker-end="url(#aAmber)"/>
+  <rect x="1825" y="676" width="62" height="26" rx="13" fill="#3a2710" stroke="#f5b14a" stroke-width="1.3"/>
+  <text x="1856" y="694" text-anchor="middle" font-size="15" font-weight="800" fill="#f7c069">NO</text>
+  <text x="1900" y="706" font-size="14" font-weight="700" fill="#edb775">Escalate to Deep Reasoning</text>
+
+  <!-- Azure AI Foundry box -->
+  <g filter="url(#cardShadow)">
+    <rect x="1700" y="728" width="316" height="172" rx="16" fill="url(#foundry)" stroke="#8a78ef" stroke-width="2"/>
+  </g>
+  <use href="#icoFoundry" x="1722" y="752" width="46" height="46" style="color:#c7b8ff"/>
+  <text x="1782" y="772" font-size="21" font-weight="700" fill="#efeaff">Azure AI Foundry</text>
+  <text x="1782" y="797" font-size="14" fill="#b3a4f2">Reasoning model deployment</text>
+  <rect x="1722" y="820" width="272" height="56" rx="10" fill="#241c4a" stroke="#6b5cd0" stroke-width="1.3"/>
+  <text x="1858" y="846" text-anchor="middle" font-size="15.5" font-weight="700" fill="#cdbdff" letter-spacing="1">ADVANCED MULTI-STEP</text>
+  <text x="1858" y="866" text-anchor="middle" font-size="15.5" font-weight="700" fill="#cdbdff" letter-spacing="1">REASONING</text>
+
+  <!-- foundry -> intelligence (refined result feeds in) -->
+  <path d="M2016 820 C2110 820 2120 612 2156 576" fill="none" stroke="#9d8cf5" stroke-width="3" stroke-dasharray="2 8" marker-end="url(#aViolet)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 5 — DECISION INTELLIGENCE LAYER                       -->
+  <!-- ============================================================= -->
+  <text x="2180" y="192" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2.5">DECISION INTELLIGENCE LAYER</text>
+  <g filter="url(#cardShadow)">
+    <rect x="2160" y="210" width="356" height="752" rx="16" fill="url(#engine)" stroke="#2f86c4" stroke-width="2"/>
+  </g>
+  <rect x="2160" y="210" width="356" height="58" rx="16" fill="#2f86c4" fill-opacity="0.16"/>
+  <text x="2338" y="248" text-anchor="middle" font-size="22" font-weight="700" fill="#eaf3ff">Incident Intelligence Engine</text>
+  <g font-size="18" font-weight="600">
+    <rect x="2184" y="292" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="338" r="6" fill="#4db8ff"/><text x="2234" y="332" fill="#eaf3ff">Root Cause Analysis</text><text x="2234" y="356" font-size="13.5" font-weight="400" fill="#8fb0d6">most-likely cause, cited evidence</text>
+    <rect x="2184" y="394" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="440" r="6" fill="#4db8ff"/><text x="2234" y="434" fill="#eaf3ff">Blast Radius Estimation</text><text x="2234" y="458" font-size="13.5" font-weight="400" fill="#8fb0d6">affected services &amp; scope</text>
+    <rect x="2184" y="496" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="542" r="6" fill="#4db8ff"/><text x="2234" y="536" fill="#eaf3ff">Business Impact</text><text x="2234" y="560" font-size="13.5" font-weight="400" fill="#8fb0d6">users impacted &amp; cost / hr</text>
+    <rect x="2184" y="598" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="644" r="6" fill="#4db8ff"/><text x="2234" y="638" fill="#eaf3ff">Confidence Score</text><text x="2234" y="662" font-size="13.5" font-weight="400" fill="#8fb0d6">per-agent &amp; combined</text>
+    <rect x="2184" y="700" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="746" r="6" fill="#4db8ff"/><text x="2234" y="740" fill="#eaf3ff">Incident Timeline</text><text x="2234" y="764" font-size="13.5" font-weight="400" fill="#8fb0d6">causal sequence of events</text>
+    <rect x="2184" y="802" width="308" height="92" rx="12" fill="#13314f" stroke="#2f5e8e" stroke-width="1.4"/>
+    <circle cx="2214" cy="848" r="6" fill="#56d49a"/><text x="2234" y="842" fill="#eaf3ff">Recommended Actions</text><text x="2234" y="866" font-size="13.5" font-weight="400" fill="#8fb0d6">ranked, risk-classified fixes</text>
+  </g>
+  <!-- intelligence -> command center -->
+  <path d="M2516 470 H2562" fill="none" stroke="#4f9cff" stroke-width="3.5" marker-end="url(#aBlue)"/>
+  <!-- intelligence -> persistence -->
+  <path d="M2338 962 V1032" fill="none" stroke="#4f9cff" stroke-width="3.5" marker-end="url(#aBlue)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 6 — PERSISTENCE LAYER                                 -->
+  <!-- ============================================================= -->
+  <text x="2180" y="1018" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2.5">PERSISTENCE LAYER</text>
+  <g filter="url(#cardShadow)">
+    <rect x="2160" y="1034" width="356" height="280" rx="16" fill="url(#panel)" stroke="#3a6299" stroke-width="2"/>
+  </g>
+  <use href="#icoDb" x="2182" y="1052" width="44" height="44" style="color:#5fd0ef"/>
+  <text x="2238" y="1072" font-size="21" font-weight="700" fill="#eaf3ff">SQLite Database</text>
+  <text x="2238" y="1095" font-size="14" fill="#8fb0d6">single source of truth</text>
+  <g font-size="16.5" font-weight="600" fill="#dbe8fb">
+    <circle cx="2198" cy="1136" r="4.5" fill="#5fd0ef"/><text x="2216" y="1142">Investigations</text>
+    <circle cx="2198" cy="1170" r="4.5" fill="#5fd0ef"/><text x="2216" y="1176">Agent Findings</text>
+    <circle cx="2198" cy="1204" r="4.5" fill="#5fd0ef"/><text x="2216" y="1210">Recommendations</text>
+    <circle cx="2198" cy="1238" r="4.5" fill="#5fd0ef"/><text x="2216" y="1244">Historical Incidents</text>
+    <circle cx="2198" cy="1272" r="4.5" fill="#5fd0ef"/><text x="2216" y="1278">Confidence Scores</text>
+  </g>
+  <!-- persistence -> command center (history) -->
+  <path d="M2516 1150 C2610 1150 2660 980 2710 952" fill="none" stroke="#7fa8d8" stroke-width="2.6" stroke-dasharray="2 8" marker-end="url(#aSlate)"/>
+
+  <!-- ============================================================= -->
+  <!-- SECTION 7 — OPSPILOT COMMAND CENTER                           -->
+  <!-- ============================================================= -->
+  <text x="2566" y="192" font-size="16" font-weight="700" fill="#5fa8e8" letter-spacing="2.5">OPSPILOT COMMAND CENTER</text>
+  <g filter="url(#cardShadow)">
+    <rect x="2564" y="210" width="410" height="752" rx="16" fill="url(#panel)" stroke="#3a6299" stroke-width="2"/>
+  </g>
+  <rect x="2564" y="210" width="410" height="58" rx="16" fill="#3a93ea" fill-opacity="0.14"/>
+  <use href="#icoDash" x="2586" y="226" width="30" height="30" style="color:#7fd0ff"/>
+  <text x="2770" y="248" text-anchor="middle" font-size="21" font-weight="700" fill="#eaf3ff">OpsPilot Command Center</text>
+  <g font-size="19" font-weight="600" fill="#eaf3ff">
+    <rect x="2588" y="296" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="334">Dashboard</text><text x="2614" y="360" font-size="13.5" font-weight="400" fill="#8fb0d6">live incident command surface</text>
+    <rect x="2588" y="398" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="436">Active Incidents</text><text x="2614" y="462" font-size="13.5" font-weight="400" fill="#8fb0d6">real-time investigation queue</text>
+    <rect x="2588" y="500" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="538">History</text><text x="2614" y="564" font-size="13.5" font-weight="400" fill="#8fb0d6">resolved &amp; past incidents</text>
+    <rect x="2588" y="602" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="640">Agent Analytics</text><text x="2614" y="666" font-size="13.5" font-weight="400" fill="#8fb0d6">fleet health &amp; escalation rate</text>
+    <rect x="2588" y="704" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="742">Incident Reports</text><text x="2614" y="768" font-size="13.5" font-weight="400" fill="#8fb0d6">exec summary &amp; export</text>
+    <rect x="2588" y="806" width="362" height="92" rx="12" fill="#16335a" stroke="#2f5e8e" stroke-width="1.4"/>
+    <text x="2614" y="844">Demo Scenarios</text><text x="2614" y="870" font-size="13.5" font-weight="400" fill="#8fb0d6">curated incident playbacks</text>
+  </g>
+  <!-- command center -> users -->
+  <path d="M2769 962 V1024" fill="none" stroke="#4f9cff" stroke-width="3.5" marker-end="url(#aBlue)"/>
+  <g filter="url(#cardShadow)">
+    <rect x="2622" y="1026" width="296" height="150" rx="16" fill="url(#card)" stroke="#3a6299" stroke-width="2"/>
+  </g>
+  <use href="#icoUsers" x="2646" y="1056" width="50" height="50" style="color:#7fd0ff"/>
+  <text x="2714" y="1080" font-size="20" font-weight="700" fill="#eaf3ff">SRE / On-Call Team</text>
+  <text x="2714" y="1106" font-size="14.5" fill="#8fb0d6">consume live root cause,</text>
+  <text x="2714" y="1128" font-size="14.5" fill="#8fb0d6">impact &amp; recommended actions</text>
+  <text x="2714" y="1156" font-size="13.5" font-weight="700" fill="#67e2a8" letter-spacing="1">HUMAN-IN-THE-LOOP APPROVAL</text>
+
+  <!-- ============================================================= -->
+  <!-- KEY CALLOUT BOX                                               -->
+  <!-- ============================================================= -->
+  <g filter="url(#cardShadow)">
+    <rect x="40" y="690" width="846" height="262" rx="18" fill="url(#callout)" stroke="#2f86c4" stroke-width="2"/>
+  </g>
+  <rect x="40" y="690" width="12" height="262" rx="6" fill="#3a93ea"/>
+  <text x="84" y="744" font-size="18" font-weight="700" fill="#5fa8e8" letter-spacing="3">WHY OPSPILOT WINS</text>
+  <text x="84" y="800" font-size="27" font-weight="700" fill="#eaf3ff">Most incident platforms stop at detection.</text>
+  <text x="84" y="852" font-size="23" font-weight="400" fill="#cfe0f5">OpsPilot autonomously <tspan font-weight="700" fill="#7fd0ff">investigates</tspan>, explains <tspan font-weight="700" fill="#7fd0ff">root cause</tspan>,</text>
+  <text x="84" y="888" font-size="23" font-weight="400" fill="#cfe0f5">and recommends <tspan font-weight="700" fill="#7fd0ff">remediation</tspan> using multi-agent reasoning &#8212;</text>
+  <text x="84" y="924" font-size="23" font-weight="400" fill="#cfe0f5">escalating to a frontier model <tspan font-weight="700" fill="#f5b14a">only when confidence is low.</tspan></text>
+
+  <!-- ============================================================= -->
+  <!-- BOTTOM RIBBON — PLATFORM CAPABILITIES                         -->
+  <!-- ============================================================= -->
+  <text x="1515" y="1392" text-anchor="middle" font-size="15" font-weight="700" fill="#5fa8e8" letter-spacing="4">POWERED BY</text>
+  <g filter="url(#cardShadow)">
+    <rect x="40" y="1410" width="2950" height="120" rx="22" fill="url(#ribbon)" stroke="#2c4f82" stroke-width="2"/>
+  </g>
+  <g font-size="20" font-weight="700" fill="#dbe8fb" text-anchor="middle">
+    <rect x="71" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="129" cy="1470" r="9" fill="#8a78ef"/><text x="298" y="1478">Azure AI Foundry</text>
+    <rect x="557" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="615" cy="1470" r="9" fill="#c7b8ff"/><text x="784" y="1478">Reasoning Models</text>
+    <rect x="1043" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="1101" cy="1470" r="9" fill="#4db8ff"/><text x="1270" y="1478">Multi-Agent Orchestration</text>
+    <rect x="1529" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="1587" cy="1470" r="9" fill="#3fc8f0"/><text x="1756" y="1478">Azure Telemetry</text>
+    <rect x="2015" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="2073" cy="1470" r="9" fill="#f5b14a"/><text x="2242" y="1478">Autonomous Investigation</text>
+    <rect x="2501" y="1438" width="455" height="64" rx="32" fill="#173353" stroke="#3a6299" stroke-width="1.5"/>
+    <circle cx="2559" cy="1470" r="9" fill="#56d49a"/><text x="2728" y="1478">Real-Time Analytics</text>
+  </g>
+
+  <!-- footer credit -->
+  <text x="1515" y="1568" text-anchor="middle" font-size="14" fill="#5b7aa6" letter-spacing="2">Microsoft Agents League &#183; Reasoning Agents Track &#183; OpsPilot Architecture</text>
+</svg>

@@ -11,15 +11,32 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`)
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }))
-    const msg: string =
-      body && typeof body.detail === 'string' ? body.detail : res.statusText
-    throw new ApiError(res.status, msg)
+export async function apiFetch<T>(
+  path: string,
+  opts?: { timeoutMs?: number },
+): Promise<T> {
+  // Optional hard timeout so a slow backend call can never hang a widget: it
+  // aborts and rejects, and SWR data hooks keep their last-known data on screen.
+  const timeoutMs = opts?.timeoutMs
+  const controller = timeoutMs ? new AbortController() : undefined
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, controller ? { signal: controller.signal } : undefined)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }))
+      const msg: string =
+        body && typeof body.detail === 'string' ? body.detail : res.statusText
+      throw new ApiError(res.status, msg)
+    }
+    return res.json() as Promise<T>
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(408, `Request to ${path} timed out after ${timeoutMs}ms`)
+    }
+    throw err
+  } finally {
+    if (timer) clearTimeout(timer)
   }
-  return res.json() as Promise<T>
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {

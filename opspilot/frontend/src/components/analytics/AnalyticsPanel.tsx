@@ -6,8 +6,8 @@
  * investigations (GET /api/analytics). No static values; empty-state when none.
  */
 import React, { useMemo } from 'react'
-import { makeStyles, tokens, Spinner } from '@fluentui/react-components'
-import { DataPieRegular } from '@fluentui/react-icons'
+import { makeStyles, tokens, Spinner, Tooltip } from '@fluentui/react-components'
+import { DataPieRegular, InfoRegular } from '@fluentui/react-icons'
 import { useAnalytics } from '../../hooks/useInsights'
 import { confidenceColor, SEVERITY_COLORS, RISK_COLORS } from '../../theme/tokens'
 import { formatDuration } from '../../utils/formatters'
@@ -22,6 +22,8 @@ const useStyles = makeStyles({
   statRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' },
   stat: { backgroundColor: tokens.colorNeutralBackground2, border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: '8px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' },
   statLabel: { fontSize: '10px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: tokens.colorNeutralForeground3 },
+  statLabelRow: { display: 'inline-flex', alignItems: 'center', gap: '4px' },
+  info: { fontSize: '13px', color: tokens.colorNeutralForeground4, cursor: 'help', ':hover': { color: tokens.colorNeutralForeground2 } },
   statValue: { fontSize: '22px', fontWeight: 700, color: tokens.colorNeutralForeground1, letterSpacing: '-0.4px' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' },
   card: { backgroundColor: tokens.colorNeutralBackground2, border: `1px solid ${tokens.colorNeutralStroke1}`, borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px',
@@ -96,7 +98,19 @@ export const AnalyticsPanel: React.FC = () => {
         <div className={s.stat}><span className={s.statLabel}>MTTR</span><span className={s.statValue}>{data.mttr_seconds ? formatDuration(data.mttr_seconds) : '—'}</span></div>
         <div className={s.stat}><span className={s.statLabel}>Mean Duration</span><span className={s.statValue}>{data.mean_duration_seconds ? formatDuration(data.mean_duration_seconds) : '—'}</span></div>
         <div className={s.stat}><span className={s.statLabel}>Agent Success</span><span className={s.statValue} style={{ color: confidenceColor(data.overall_agent_success_rate ?? 0) }}>{data.overall_agent_success_rate ?? 0}%</span></div>
-        <div className={s.stat}><span className={s.statLabel}>Escalation Rate</span><span className={s.statValue}>{data.reasoning_escalation_rate ?? 0}%</span></div>
+        <div className={s.stat}>
+          <span className={`${s.statLabel} ${s.statLabelRow}`}>
+            Reasoning Escalations
+            <Tooltip
+              content="Share of investigations that escalated to the Deep Reasoning model. OpsPilot only invokes the expensive reasoning step when confidence is low — most incidents resolve without it, keeping cost and latency down."
+              relationship="description"
+              withArrow
+            >
+              <InfoRegular className={s.info} tabIndex={0} aria-label="About reasoning escalations" />
+            </Tooltip>
+          </span>
+          <span className={s.statValue}>{data.reasoning_escalation_rate ?? 0}%</span>
+        </div>
       </div>
 
       <div className={s.grid}>

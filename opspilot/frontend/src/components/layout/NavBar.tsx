@@ -15,6 +15,12 @@ import {
   MenuList,
   MenuItem,
   mergeClasses,
+  Dialog,
+  DialogSurface,
+  DialogBody,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@fluentui/react-components'
 import {
   AlertRegular,
@@ -22,7 +28,6 @@ import {
   PersonRegular,
   SignOutRegular,
 } from '@fluentui/react-icons'
-import { useNotify } from '../../store/NotificationContext'
 
 // ── Types & mock data ─────────────────────────────────────────────────────────────
 
@@ -273,13 +278,34 @@ const useStyles = makeStyles({
   notifMsgRead: {
     color: tokens.colorNeutralForeground3,
   },
+  // Read-only profile dialog
+  profileGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+    columnGap: '20px',
+    rowGap: '10px',
+    alignItems: 'baseline',
+    marginTop: '4px',
+  },
+  profileLabel: {
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    color: tokens.colorNeutralForeground3,
+  },
+  profileValue: {
+    fontSize: '14px',
+    color: tokens.colorNeutralForeground1,
+  },
 })
 
 export const NavBar: React.FC<NavBarProps> = ({ activePage, pageLabels }) => {
   const s = useStyles()
-  const notify = useNotify()
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS)
   const [open, setOpen] = useState(false)
+  // Read-only profile dialog (avatar menu → Profile). UI-only, no backend.
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const unreadCount = notifs.filter((n) => !n.read).length
 
@@ -430,19 +456,43 @@ export const NavBar: React.FC<NavBarProps> = ({ activePage, pageLabels }) => {
             <MenuList>
               <MenuItem
                 icon={<PersonRegular />}
-                onClick={() => notify({ title: 'Profile', body: 'Signed in as M K (demo)' })}
+                onClick={() => setProfileOpen(true)}
               >
                 Profile
               </MenuItem>
               <MenuItem
                 icon={<SignOutRegular />}
-                onClick={() => notify({ title: 'Signed out', body: 'Demo session ended', intent: 'info' })}
+                onClick={() => window.dispatchEvent(new CustomEvent('opspilot:signout'))}
               >
                 Sign out
               </MenuItem>
             </MenuList>
           </MenuPopover>
         </Menu>
+
+        {/* Read-only profile dialog (no backend; opened from the avatar menu) */}
+        <Dialog open={profileOpen} onOpenChange={(_, d) => setProfileOpen(d.open)}>
+          <DialogSurface>
+            <DialogBody>
+              <DialogTitle>Profile</DialogTitle>
+              <DialogContent>
+                <div className={s.profileGrid}>
+                  <span className={s.profileLabel}>Name</span>
+                  <span className={s.profileValue}>Reyas Khan</span>
+                  <span className={s.profileLabel}>GitHub</span>
+                  <span className={s.profileValue}>rewyekha</span>
+                  <span className={s.profileLabel}>Project</span>
+                  <span className={s.profileValue}>OpsPilot – Autonomous Incident Intelligence Platform</span>
+                  <span className={s.profileLabel}>Role</span>
+                  <span className={s.profileValue}>Creator</span>
+                </div>
+              </DialogContent>
+              <DialogActions>
+                <Button appearance="primary" onClick={() => setProfileOpen(false)}>Close</Button>
+              </DialogActions>
+            </DialogBody>
+          </DialogSurface>
+        </Dialog>
       </div>
     </header>
   )

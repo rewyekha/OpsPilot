@@ -58,7 +58,7 @@ export const AnalyticsBlade: React.FC<{ open: boolean; onClose: () => void; onOp
             <div className={s.stats}>
               <div className={s.stat}><span className={s.statLabel}>MTTR</span><span className={s.statValue}>{data.mttr_seconds ? formatDuration(data.mttr_seconds) : '—'}</span></div>
               <div className={s.stat}><span className={s.statLabel}>Agent Accuracy</span><span className={s.statValue} style={{ color: confidenceColor(data.overall_agent_success_rate ?? 0) }}>{data.overall_agent_success_rate ?? 0}%</span></div>
-              <div className={s.stat}><span className={s.statLabel}>Escalation Rate</span><span className={s.statValue}>{data.reasoning_escalation_rate ?? 0}%</span></div>
+              <div className={s.stat} title="Share of investigations that escalated to the Deep Reasoning model — OpsPilot only invokes expensive reasoning when confidence is low."><span className={s.statLabel}>Reasoning Escalations</span><span className={s.statValue}>{data.reasoning_escalation_rate ?? 0}%</span></div>
               <div className={s.stat}><span className={s.statLabel}>Investigations</span><span className={s.statValue}>{data.total_investigations}</span></div>
             </div>
           </BladeSection>

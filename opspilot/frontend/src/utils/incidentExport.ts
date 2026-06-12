@@ -22,6 +22,8 @@ export interface SnapshotInput {
   agents?: ApiAgentTask[]
   jobs?: ActionJob[]
   sessionEvents?: SessionTimelineEvent[]
+  /** Overall combined confidence for the investigation (0–100), from the record. */
+  combinedConfidence?: number
   generatedAt: string
 }
 

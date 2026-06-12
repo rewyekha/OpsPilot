@@ -29,18 +29,21 @@ const useStyles = makeStyles({
   muted: { fontSize: '12px', color: tokens.colorNeutralForeground4 },
 })
 
-export const ServiceBlade: React.FC<{ service: ApiServiceHealth | null; open: boolean; onClose: () => void }> = ({
-  service,
-  open,
-  onClose,
-}) => {
+export const ServiceBlade: React.FC<{
+  service: ApiServiceHealth | null
+  /** Active incident for this service, if any — passed so the modal derives the
+   *  SAME status as the Monitored Services card (they must never disagree). */
+  incident?: { severity?: string }
+  open: boolean
+  onClose: () => void
+}> = ({ service, incident, open, onClose }) => {
   const s = useStyles()
   const { createInvestigation } = useSession()
   const notify = useNotify()
   const fmt = useFormatters()
 
   if (!service) return null
-  const status = deriveServiceStatus(service)
+  const status = deriveServiceStatus(service, incident)
   const cfg = STATUS_STYLE[status]
 
   const investigate = () => {

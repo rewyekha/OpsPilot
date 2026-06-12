@@ -198,7 +198,7 @@ export const LoginPage: React.FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
         <div className={s.form}>
           <label className={s.field}>
             <span className={s.fieldIcon}><PersonRegular /></span>
-            <input className={s.input} type="email" placeholder="work email" defaultValue="sysadmin@opspilot.io" autoComplete="username" />
+            <input className={s.input} type="email" placeholder="work email" defaultValue="SREengineer@opspilot.io" autoComplete="username" />
           </label>
           <label className={s.field}>
             <span className={s.fieldIcon}><LockClosedRegular /></span>

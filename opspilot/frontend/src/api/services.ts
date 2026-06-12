@@ -19,6 +19,6 @@ export interface ApiMonitoredServicesResponse {
 }
 
 export const servicesApi = {
-  list: (): Promise<ApiMonitoredServicesResponse> =>
-    apiFetch<ApiMonitoredServicesResponse>('/api/system/services'),
+  list: (timeoutMs?: number): Promise<ApiMonitoredServicesResponse> =>
+    apiFetch<ApiMonitoredServicesResponse>('/api/system/services', { timeoutMs }),
 }

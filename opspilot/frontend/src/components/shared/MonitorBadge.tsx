@@ -6,7 +6,6 @@
 import React, { useEffect, useState } from 'react'
 import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
 import { systemApi, type MonitorStatus } from '../../api/system'
-import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 
 const useStyles = makeStyles({
   badge: {
@@ -31,7 +30,6 @@ const useStyles = makeStyles({
 
 export const MonitorBadge: React.FC = () => {
   const s = useStyles()
-  useMountLog('MonitorBadge') // TEMP-DEBUG
   const [m, setM] = useState<MonitorStatus | null>(null)
 
   useEffect(() => {

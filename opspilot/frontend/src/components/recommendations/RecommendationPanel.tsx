@@ -42,11 +42,10 @@ import {
   ServerRegular,
   OpenRegular,
 } from '@fluentui/react-icons'
-import { useLiveInvestigation } from '../../hooks/useLiveInvestigation'
+import { useLiveInvestigation, type LiveAgent, type AgentRunStatus } from '../../hooks/useLiveInvestigation'
 import { useLatestInvestigation } from '../../hooks/useInsights'
 import type { ApiRecommendedAction } from '../../api/recommendations'
 import type { StoredAction } from '../../api/insights'
-import { EmptyState } from '../shared/EmptyState'
 import { StreamStatusBadge } from '../shared/StreamStatusBadge'
 import { SeverityBadge, AgentStatusBadge, RiskBadge, IncidentStatusBadge } from '../shared/SeverityBadge'
 import { ConfidenceBar } from '../shared/ConfidenceBar'
@@ -61,7 +60,6 @@ import { useSession } from '../../store/SessionContext'
 import { useFormatters } from '../../store/PreferencesContext'
 import { useActiveIncidents } from '../../hooks/useActiveIncidents'
 import { MonitorBadge } from '../shared/MonitorBadge'
-import { useMountLog } from '../../utils/debugMountLog' // TEMP-DEBUG
 import { formatCurrency, formatCompactNumber, formatDuration } from '../../utils/formatters'
 import { confidenceColor } from '../../theme/tokens'
 
@@ -132,6 +130,54 @@ const useStyles = makeStyles({
     textOverflow: 'ellipsis',
   },
   mono: { fontFamily: '"Cascadia Code", "Consolas", monospace', fontSize: '15px' },
+
+  // ── All-clear (no active incident) ───────────────────────────────────────────
+  okBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    backgroundColor: tokens.colorNeutralBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: '8px',
+    padding: '16px 18px',
+  },
+  okDot: {
+    width: '10px',
+    height: '10px',
+    minWidth: '10px',
+    borderRadius: '50%',
+    backgroundColor: '#22c55e',
+    boxShadow: '0 0 0 4px rgba(34,197,94,0.15)',
+  },
+  okMain: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  okTitle: { fontSize: '14px', fontWeight: 600, color: tokens.colorNeutralForeground1 },
+  okBody: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
+  // Compact "last resolved investigation" reference row.
+  histRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    backgroundColor: tokens.colorNeutralBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: '8px',
+    padding: '10px 14px',
+  },
+  histLabel: {
+    fontSize: '10px',
+    fontWeight: 700,
+    letterSpacing: '0.6px',
+    textTransform: 'uppercase',
+    color: tokens.colorNeutralForeground3,
+  },
+  histId: {
+    fontFamily: '"Cascadia Code", "Consolas", monospace',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: tokens.colorNeutralForeground1,
+  },
+  histMeta: { fontSize: '12px', color: tokens.colorNeutralForeground3 },
+  histSpacer: { marginLeft: 'auto' },
 
   // ── Table ────────────────────────────────────────────────────────────────────
   card: {
@@ -254,22 +300,25 @@ const Kpi: React.FC<KpiProps> = ({ label, children }) => {
 
 export const RecommendationPanel: React.FC = () => {
   const s = useStyles()
-  useMountLog('RecommendationPanel') // TEMP-DEBUG
-  // Single source of truth — the latest persisted investigation. The incident
-  // summary, confidence, blast radius, cost and recommendations all come from a
-  // real completed run (or the empty state); nothing is seeded from static data.
-  const latest = useLatestInvestigation()
   // Currently-active incidents (telemetry-detected by the autonomous monitor or
   // user-created). Polled so an AUTO-detected incident appears here in real time.
   const active = useActiveIncidents()
+  // Single source of truth — a real persisted investigation; nothing seeded. WHICH
+  // one depends on state: while an incident is ACTIVE we show THAT incident's own
+  // latest run (so executing a scenario surfaces the findings for the incident it
+  // raised), else the most recent investigation across all incidents (idle view).
+  const activeId = active.data?.[0]?.id ?? ''
+  const scopedLatest = useLatestInvestigation(activeId || undefined)
+  const globalLatest = useLatestInvestigation()
+  const latest = activeId ? scopedLatest : globalLatest
   // Live investigation queue — driven entirely by real SSE orchestrator events.
   // Watches the active incident if one exists (so the autonomous run streams live
   // before its record persists), else the latest persisted investigation.
   // Read-only; opening the stream never starts a run. Empty id → no stream.
-  const watchId = active.data?.[0]?.id ?? latest.data?.incident_id ?? ''
+  const watchId = activeId || latest.data?.incident_id || ''
   const live = useLiveInvestigation(watchId)
   const streamStatus = live.connection
-  const { jobs, timelineEvents, incidentStatus } = useSession()
+  const { jobs, timelineEvents, incidents } = useSession()
   const fmt = useFormatters()
   const [investigationOpen, setInvestigationOpen] = useState(false)
   const [analyticsOpen, setAnalyticsOpen] = useState(false)
@@ -293,11 +342,56 @@ export const RecommendationPanel: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [record],
   )
-  const agents = live.agents
+  // Investigation queue source of truth: the LIVE SSE roster WHILE a run is
+  // actively streaming, else the PERSISTED record's agents. The live queue is
+  // ephemeral — it lives only in this component's state, is torn down when the
+  // dashboard unmounts on navigation, and a COMPLETED stream replays nothing on
+  // reconnect. Without this fallback the queue goes empty after navigating away
+  // and back, and only refills when the autonomous monitor pays for a whole new
+  // investigation (~1–2 min later). Hydrating from the persisted record (the same
+  // single source of truth the KPIs already use) restores the queue instantly on
+  // remount, with no re-run and no SSE dependency.
+  const persistedAgents = useMemo<LiveAgent[]>(
+    () =>
+      (record?.agents ?? []).map((a) => ({
+        role: a.role,
+        label: a.role_label,
+        status: (a.status === 'running' || a.status === 'pending' ? a.status : 'complete') as AgentRunStatus,
+        confidence: a.confidence,
+        finding: a.finding,
+        durationMs: a.duration_seconds * 1000,
+      })),
+    [record],
+  )
+  const agents = live.agents.length > 0 ? live.agents : persistedAgents
 
   // Confidence: live (SSE) while running, else the real persisted value.
   const confidence = live.confidence ?? record?.combined_confidence ?? 0
-  const lifecycle = incidentStatus(record?.incident_id ?? '')
+
+  // ── Active vs historical ─────────────────────────────────────────────────────
+  // The Incident Summary headlines a LIVE incident ONLY when one is genuinely
+  // active (/api/incidents/active — telemetry-detected, user-created, or a forced
+  // outage). Otherwise it shows an all-clear state and surfaces the last run as
+  // RESOLVED history — never a stale, perpetual P0 left over from a past run.
+  const activeList = active.data ?? []
+  const hasActiveIncident = activeList.length > 0
+  // The active incident matching the persisted RCA (so its blast radius / cost /
+  // recommendations are valid for display), else the first active incident.
+  const featured = activeList.find((i) => i.id === record?.incident_id) ?? activeList[0] ?? null
+  const rcaMatches = !!record && !!rootCause && !!featured && record.incident_id === featured.id
+  const featuredId = featured?.id ?? record?.incident_id ?? ''
+  // Operator action this session wins; else active → investigating, idle → resolved.
+  const lifecycle = incidents[featuredId]?.status ?? (hasActiveIncident ? 'investigating' : 'resolved')
+  // Live-strip KPI values — sourced from the persisted RCA only when it matches the
+  // active incident; otherwise shown as '—' rather than borrowed from a stale run.
+  // Confidence falls back to the live SSE value (a run streaming for THIS incident),
+  // never to an unrelated past investigation's number.
+  const liveSeverity = (rcaMatches ? record?.severity : featured?.severity) ?? ''
+  const liveConfidence = rcaMatches ? confidence : live.confidence ?? 0
+  const liveRecs = rcaMatches ? record?.recommendations.length ?? 0 : 0
+  const liveBlast = rcaMatches ? rootCause?.blast_radius ?? 0 : 0
+  const liveUsers = rcaMatches ? rootCause?.affected_users ?? 0 : 0
+  const liveCost = rcaMatches ? rootCause?.hourly_impact_usd ?? 0 : 0
 
   if (latest.loading) {
     return (
@@ -328,14 +422,15 @@ export const RecommendationPanel: React.FC = () => {
         </div>
       </div>
 
-      {hasRecord && record && rootCause ? (
+      {hasActiveIncident ? (
+        // ── LIVE incident: a genuinely active incident exists right now ──────────
         <>
         <div className={s.summary}>
           <Kpi label="Incident">
-            <span className={mergeClasses(s.kpiValue, s.mono)}>{record.incident_id}</span>
+            <span className={mergeClasses(s.kpiValue, s.mono)}>{featuredId || '—'}</span>
           </Kpi>
           <Kpi label="Severity">
-            <span>{record.severity ? <SeverityBadge severity={record.severity} pill /> : <span className={s.kpiValue}>—</span>}</span>
+            <span>{liveSeverity ? <SeverityBadge severity={liveSeverity} pill /> : <span className={s.kpiValue}>—</span>}</span>
           </Kpi>
           <Kpi label="Status">
             <span>
@@ -343,41 +438,58 @@ export const RecommendationPanel: React.FC = () => {
             </span>
           </Kpi>
           <Kpi label="Confidence">
-            <span className={s.kpiValue} style={{ color: confidenceColor(confidence) }}>
-              {Math.round(confidence)}%
+            <span className={s.kpiValue} style={{ color: confidenceColor(liveConfidence) }}>
+              {liveConfidence ? `${Math.round(liveConfidence)}%` : '—'}
             </span>
           </Kpi>
           <Kpi label="Recommendations">
-            <span className={s.kpiValue}>{record.recommendations.length || '—'}</span>
+            <span className={s.kpiValue}>{liveRecs || '—'}</span>
           </Kpi>
           <Kpi label="Blast Radius">
             <span className={s.kpiValue}>
-              {rootCause.blast_radius || rootCause.affected_users
-                ? `${rootCause.blast_radius} svc · ${formatCompactNumber(rootCause.affected_users)} users`
+              {liveBlast || liveUsers
+                ? `${liveBlast} svc · ${formatCompactNumber(liveUsers)} users`
                 : '—'}
             </span>
           </Kpi>
           <Kpi label="Cost Impact">
             <span className={s.kpiValue} style={{ color: '#f87171' }}>
-              {rootCause.hourly_impact_usd ? `${formatCurrency(rootCause.hourly_impact_usd)}/hr` : '—'}
+              {liveCost ? `${formatCurrency(liveCost)}/hr` : '—'}
             </span>
           </Kpi>
         </div>
-        {rootCause.blast_radius || rootCause.affected_users || rootCause.hourly_impact_usd ? (
+        {liveBlast || liveUsers || liveCost ? (
           <div style={{ fontSize: '11px', color: tokens.colorNeutralForeground4, marginTop: '2px' }}>
             Blast radius, affected users and cost impact are estimated by the Root Cause agent from telemetry evidence.
           </div>
         ) : null}
         </>
       ) : (
-        <div className={s.card}>
-          <EmptyState
-            title="No investigations yet"
-            body="Run an investigation to populate the incident summary, confidence, blast radius and recommendations — all from real agent execution."
-            actionLabel="Open Investigation"
-            onAction={() => setInvestigationOpen(true)}
-          />
+        // ── All clear: nothing is active. Surface the last run as resolved history.
+        <>
+        <div className={s.okBanner}>
+          <span className={s.okDot} />
+          <div className={s.okMain}>
+            <span className={s.okTitle}>No active incidents</span>
+            <span className={s.okBody}>
+              All monitored services are healthy. Open an investigation or run a demo scenario to begin.
+            </span>
+          </div>
         </div>
+        {hasRecord && record && rootCause ? (
+          <div className={s.histRow}>
+            <span className={s.histLabel}>Last resolved investigation</span>
+            <span className={s.histId}>{record.incident_id}</span>
+            {record.severity ? <SeverityBadge severity={record.severity} pill /> : null}
+            <span className={s.histMeta}>{Math.round(record.combined_confidence)}% confidence</span>
+            <span className={s.histMeta}>resolved {fmt.relative(record.completed_at)}</span>
+            <span className={s.histSpacer} />
+            <Button size="small" appearance="secondary" icon={<OpenRegular />} onClick={() => setInvestigationOpen(true)}>
+              Open
+            </Button>
+          </div>
+        ) : null}
+        </>
       )}
 
       {/* ── Investigation overview ─────────────────────────────────────────── */}

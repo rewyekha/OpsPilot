@@ -6,7 +6,7 @@
  * detects + investigates the resulting telemetry anomaly. Backed entirely by the
  * real /api/demo endpoints — it never fabricates a scenario result.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { makeStyles, tokens, Button, Spinner, Dropdown, Option } from '@fluentui/react-components'
 import { PlayRegular, ArrowUndoRegular, BeakerRegular } from '@fluentui/react-icons'
 import { demoApi, type DemoScenarioList, type DemoRunStatus } from '../../api/demo'
@@ -65,6 +65,13 @@ export const DemoScenariosPanel: React.FC = () => {
   const [list, setList] = useState<DemoScenarioList | null>(null)
   const [statuses, setStatuses] = useState<Record<string, DemoRunStatus>>({})
   const [selectedApp, setSelectedApp] = useState<string>('')
+  // Smooth per-second timer. The backend status is only re-fetched on the periodic
+  // poll (~5s), which made the elapsed counter jump (5s → 10s → 14s). We interpolate
+  // between polls so it counts 1s, 2s, 3s… `setTick` just forces a 1Hz re-render;
+  // `anchorRef` holds the elapsed value last reported by the backend + the client
+  // clock when we received it, and displayElapsed() extrapolates from there.
+  const [, setTick] = useState(0)
+  const anchorRef = useRef<Record<string, { base: number; at: number }>>({})
 
   const reload = useCallback(() => { demoApi.list().then(setList).catch(() => {}) }, [])
   useEffect(() => {
@@ -88,21 +95,66 @@ export const DemoScenariosPanel: React.FC = () => {
   useEffect(() => {
     if (!ids || !selectedApp) return
     const poll = () => ids.split(',').forEach((id) =>
-      demoApi.status(id, selectedApp).then((st) => setStatuses((p) => ({ ...p, [id]: st }))).catch(() => {}))
+      demoApi.status(id, selectedApp).then((st) => {
+        setStatuses((p) => ({ ...p, [id]: st }))
+        // Re-anchor the local timer to the authoritative backend elapsed on each
+        // poll (so it never drifts); clear it the moment the run is no longer live.
+        if (st.state === 'running') anchorRef.current[id] = { base: st.elapsed_seconds ?? 0, at: Date.now() }
+        else delete anchorRef.current[id]
+      }).catch(() => {}))
     poll()
     window.addEventListener('opspilot:poll', poll)
     return () => window.removeEventListener('opspilot:poll', poll)
   }, [ids, selectedApp])
 
-  const run = (id: string, name: string) =>
-    demoApi.run(id, selectedApp)
-      .then(() => notify({ title: `Scenario started: ${name} on ${selectedApp}`, body: 'Breaking the workload — watch the Dashboard for the auto-detected incident.', intent: 'success' }))
-      .catch((e: unknown) => notify({ title: 'Could not start scenario', body: e instanceof Error ? e.message : 'Request failed', intent: 'error' }))
+  // Re-render every second while any scenario is running so the interpolated timer
+  // advances smoothly; the interval is torn down as soon as nothing is running.
+  const anyRunning = useMemo(
+    () => Object.values(statuses).some((st) => st?.state === 'running')
+      || (list?.scenarios ?? []).some((sc) => sc.running),
+    [statuses, list],
+  )
+  useEffect(() => {
+    if (!anyRunning) return
+    const t = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [anyRunning])
 
-  const rollback = (id: string, name: string) =>
-    demoApi.rollback(id, selectedApp)
+  // Seconds to show for a running scenario: extrapolated from the last poll anchor
+  // (ticks up locally each second), falling back to the raw backend value.
+  const displayElapsed = (id: string, st?: DemoRunStatus): number => {
+    const a = anchorRef.current[id]
+    if (a) return Math.max(0, Math.floor(a.base + (Date.now() - a.at) / 1000))
+    return st?.elapsed_seconds ? Math.floor(st.elapsed_seconds) : 0
+  }
+
+  // Optimistically mark the scenario running and anchor the timer at 0s so the
+  // counter starts immediately on click (instead of waiting for the first poll).
+  // The poll reconciles to the real backend status within a few seconds; a failed
+  // start reverts to idle.
+  const beginLocal = (id: string, action: string) => {
+    anchorRef.current[id] = { base: 0, at: Date.now() }
+    setStatuses((p) => ({ ...p, [id]: { scenario: id, state: 'running', action, elapsed_seconds: 0 } }))
+    setTick((n) => n + 1)
+  }
+  const revertLocal = (id: string) => {
+    delete anchorRef.current[id]
+    setStatuses((p) => ({ ...p, [id]: { scenario: id, state: 'idle' } }))
+  }
+
+  const run = (id: string, name: string) => {
+    beginLocal(id, 'execute')
+    return demoApi.run(id, selectedApp)
+      .then(() => notify({ title: `Scenario started: ${name} on ${selectedApp}`, body: 'Breaking the workload — watch the Dashboard for the auto-detected incident.', intent: 'success' }))
+      .catch((e: unknown) => { revertLocal(id); notify({ title: 'Could not start scenario', body: e instanceof Error ? e.message : 'Request failed', intent: 'error' }) })
+  }
+
+  const rollback = (id: string, name: string) => {
+    beginLocal(id, 'rollback')
+    return demoApi.rollback(id, selectedApp)
       .then(() => notify({ title: `Rolling back: ${name} on ${selectedApp}`, body: 'Restoring the workload to a healthy state.', intent: 'info' }))
-      .catch((e: unknown) => notify({ title: 'Could not roll back', body: e instanceof Error ? e.message : 'Request failed', intent: 'error' }))
+      .catch((e: unknown) => { revertLocal(id); notify({ title: 'Could not roll back', body: e instanceof Error ? e.message : 'Request failed', intent: 'error' }) })
+  }
 
   const enabled = !!list?.demo_mode_enabled && !!list?.pwsh_available
 
@@ -156,7 +208,7 @@ export const DemoScenariosPanel: React.FC = () => {
               <span className={s.desc}>{sc.description}</span>
               <span className={s.status}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: stateColor(st), display: 'inline-block' }} />
-                {running ? <><Spinner size="extra-tiny" /> {st?.action ?? 'running'}…{st?.elapsed_seconds ? ` ${Math.round(st.elapsed_seconds)}s` : ''}</>
+                {running ? <><Spinner size="extra-tiny" /> {st?.action ?? 'running'}… {displayElapsed(sc.id, st)}s</>
                   : st && st.state === 'finished' ? `${st.action} ${st.returncode === 0 ? 'succeeded' : `exited ${st.returncode}`}`
                   : 'idle'}
               </span>

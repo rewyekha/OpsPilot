@@ -22,10 +22,16 @@ import structlog
 from fastapi import APIRouter, HTTPException, status
 
 from app.config import Settings, get_settings
+from app.services import availability
 
 log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/demo", tags=["demo"])
+
+# Scenario that takes a service genuinely offline. The control plane performs the
+# real outage, so it records the service as down the moment Execute launches —
+# giving the dashboard + monitor a deterministic, ingestion-lag-free signal.
+_OUTAGE_SCENARIO = "service-outage"
 
 # id -> metadata. ids MUST match the script filenames in infra/scripts/scenarios.
 SCENARIOS: dict[str, dict] = {
@@ -118,6 +124,15 @@ def _run_blocking(scenario_id: str, args: list[str], state: dict) -> None:
         state["returncode"] = -1
     finally:
         state["done"] = True
+        # Reconcile the availability registry with the ACTUAL outcome (we optimistically
+        # marked the service down at Execute launch for an instant demo signal). The
+        # service is back UP if execute failed (outage never took) OR rollback
+        # succeeded (ingress restored).
+        if scenario_id == _OUTAGE_SCENARIO:
+            ok = state.get("returncode") == 0
+            action = state.get("action")
+            if (action == "execute" and not ok) or (action == "rollback" and ok):
+                availability.mark_up(state.get("app", ""))
         log.info("demo.scenario.finished", scenario=scenario_id,
                  action=state.get("action"), returncode=state.get("returncode"))
 
@@ -150,6 +165,13 @@ async def _launch(scenario_id: str, rollback: bool, app: str | None) -> dict:
         "started_at": time.time(), "output": "", "returncode": None, "done": False, "pid": None,
     }
     _RUNS[_run_key(scenario_id, app_name)] = state
+
+    # Outage scenario: record the real outage state up-front so the dashboard +
+    # monitor react within one scan (≤30s) instead of waiting 5–8 min for App
+    # Insights to reflect the silence. Reconciled in _run_blocking if execute fails.
+    if scenario_id == _OUTAGE_SCENARIO and not rollback:
+        availability.mark_down(app_name, reason="service-outage scenario (ingress disabled)")
+
     threading.Thread(target=_run_blocking, args=(scenario_id, args, state), daemon=True).start()
     log.info("demo.scenario.launched", scenario=scenario_id, app=app_name, action=state["action"])
     return {"scenario": scenario_id, "app": app_name, "action": state["action"], "status": "started"}

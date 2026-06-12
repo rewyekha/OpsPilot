@@ -72,17 +72,20 @@ try {
         targetPort = [int]$port
     } | Out-Null
 
-    # Seed recent traffic so the service-down rule has a prior-activity baseline.
+    # Seed a short burst of baseline traffic so live telemetry has a prior-activity
+    # baseline too. Detection no longer DEPENDS on this (OpsPilot's control plane
+    # records the outage the moment Execute launches and the monitor raises the
+    # incident on its next scan), so a brief seed is enough — no long wait.
     $url = Resolve-AppUrl -ResourceGroup $ResourceGroup -AppName $AppName -BaseUrl $BaseUrl
-    Write-Info 'Seeding ~45s of baseline traffic so the outage is detectable…'
-    Send-Load -Url "$url$HealthPath" -DurationSeconds 45 -Parallel 15 -Label 'baseline-200' | Out-Null
+    Write-Info 'Seeding ~15s of baseline traffic…'
+    Send-Load -Url "$url$HealthPath" -DurationSeconds 15 -Parallel 15 -Label 'baseline-200' | Out-Null
 
     Write-Info 'Disabling external ingress → service becomes unreachable'
     az containerapp ingress disable --name $AppName --resource-group $ResourceGroup --only-show-errors | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "az containerapp ingress disable failed (exit $LASTEXITCODE)." }
 
     Write-Ok "[$ScenarioId] ingress disabled — $AppName is now unreachable (real outage)."
-    Write-Info 'Allow ~5-8 min: once the seeded traffic ages out of the 5-min window, OpsPilot raises a P1 service-down incident.'
+    Write-Info 'OpsPilot marks the service DOWN immediately and raises a P1 service-down incident within ~30-60s (next monitor scan) — no 5-8 min wait.'
     Write-Info "Undo with:  ./service-outage.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -Rollback"
     Write-ScenarioResult -ScenarioId $ScenarioId -Action 'execute' -Status 'ok'
     exit 0

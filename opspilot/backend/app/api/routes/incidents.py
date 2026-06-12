@@ -34,7 +34,10 @@ router = APIRouter(prefix="/incidents", tags=["incidents"])
 )
 async def get_active_incidents() -> list[IncidentRecord]:
     incidents = await incident_service.get_active_incidents()
-    log.info("incidents.active.listed", count=len(incidents))
+    # debug, not info: this endpoint is polled continuously by the dashboard, so an
+    # info line here floods the terminal. Real operational events (incident created,
+    # investigation dispatched/complete) are still logged at info elsewhere.
+    log.debug("incidents.active.listed", count=len(incidents))
     return incidents
 
 

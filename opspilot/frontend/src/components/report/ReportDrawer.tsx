@@ -15,6 +15,8 @@ import {
 } from '@fluentui/react-icons'
 import { DetailDrawer, DrawerSection, EvidenceList } from '../shared/DetailDrawer'
 import { RiskBadge } from '../shared/SeverityBadge'
+import { ConfidenceBar } from '../shared/ConfidenceBar'
+import { confidenceColor } from '../../theme/tokens'
 import { useNotify } from '../../store/NotificationContext'
 import { useFormatters } from '../../store/PreferencesContext'
 import {
@@ -34,6 +36,28 @@ const useStyles = makeStyles({
   list: { margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' },
   item: { fontSize: '13px', color: tokens.colorNeutralForeground2, lineHeight: 1.5 },
   sub: { fontSize: '13px', fontWeight: 600, color: tokens.colorNeutralForeground1, margin: '4px 0 2px' },
+
+  // ── Executive summary cards (at-a-glance, before detailed evidence) ──────────
+  summaryGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+    gap: '1px',
+    backgroundColor: tokens.colorNeutralStroke1,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: '8px',
+    overflow: 'hidden',
+    marginBottom: '12px',
+  },
+  summaryCell: { backgroundColor: tokens.colorNeutralBackground2, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 },
+  summaryLabel: { fontSize: '10px', fontWeight: 600, letterSpacing: '0.6px', textTransform: 'uppercase', color: tokens.colorNeutralForeground3 },
+  summaryValue: { fontSize: '15px', fontWeight: 700, color: tokens.colorNeutralForeground1, lineHeight: 1.3 },
+
+  // ── Confidence breakdown (explainability) ───────────────────────────────────
+  breakdown: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  breakdownRow: { display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: '12px' },
+  breakdownLabel: { fontSize: '12px', color: tokens.colorNeutralForeground2 },
+  breakdownOverall: { marginTop: '4px', paddingTop: '10px', borderTop: `1px solid ${tokens.colorNeutralStroke1}` },
+  breakdownLabelStrong: { fontSize: '12px', fontWeight: 700, color: tokens.colorNeutralForeground1 },
 })
 
 export interface ReportDrawerProps {
@@ -48,6 +72,10 @@ export const ReportDrawer: React.FC<ReportDrawerProps> = ({ input, open, onClose
   const fmt = useFormatters()
 
   const { rootCause, actions = [], agents = [], jobs = [], sessionEvents = [] } = input
+
+  // Per-agent confidence drives the explainability breakdown — only agents that
+  // actually produced a confidence score (real execution output, never fabricated).
+  const breakdownAgents = agents.filter((a) => a.confidence > 0)
 
   const handleMarkdown = () => {
     downloadBlob(`${input.incidentId}-report.md`, snapshotToMarkdown(input), 'text/markdown')
@@ -89,6 +117,30 @@ export const ReportDrawer: React.FC<ReportDrawerProps> = ({ input, open, onClose
       </div>
 
       <DrawerSection label="Executive Summary">
+        {rootCause && (
+          <div className={s.summaryGrid}>
+            <div className={s.summaryCell}>
+              <span className={s.summaryLabel}>Root Cause</span>
+              <span className={s.summaryValue}>{rootCause.title}</span>
+            </div>
+            <div className={s.summaryCell}>
+              <span className={s.summaryLabel}>Confidence</span>
+              <span className={s.summaryValue} style={{ color: confidenceColor(rootCause.confidence) }}>
+                {Math.round(rootCause.confidence)}%
+              </span>
+            </div>
+            <div className={s.summaryCell}>
+              <span className={s.summaryLabel}>Impact</span>
+              <span className={s.summaryValue}>
+                {rootCause.blast_radius} service{rootCause.blast_radius === 1 ? '' : 's'} · {rootCause.affected_users.toLocaleString()} users
+              </span>
+            </div>
+            <div className={s.summaryCell}>
+              <span className={s.summaryLabel}>Recommendations</span>
+              <span className={s.summaryValue}>{actions.length}</span>
+            </div>
+          </div>
+        )}
         <p className={s.p}>
           {rootCause
             ? `${rootCause.title} — ${rootCause.description} Confidence ${Math.round(
@@ -97,6 +149,25 @@ export const ReportDrawer: React.FC<ReportDrawerProps> = ({ input, open, onClose
             : 'No root cause synthesized yet.'}
         </p>
       </DrawerSection>
+
+      {breakdownAgents.length > 0 && (
+        <DrawerSection label="Investigation Confidence Breakdown">
+          <div className={s.breakdown}>
+            {breakdownAgents.map((a) => (
+              <div key={a.id} className={s.breakdownRow}>
+                <span className={s.breakdownLabel}>{a.role_label}</span>
+                <ConfidenceBar value={a.confidence} animate={false} />
+              </div>
+            ))}
+            {typeof input.combinedConfidence === 'number' && (
+              <div className={`${s.breakdownRow} ${s.breakdownOverall}`}>
+                <span className={s.breakdownLabelStrong}>Overall Confidence</span>
+                <ConfidenceBar value={input.combinedConfidence} animate={false} />
+              </div>
+            )}
+          </div>
+        </DrawerSection>
+      )}
 
       <DrawerSection label="Timeline">
         {sessionEvents.length ? (

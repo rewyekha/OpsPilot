@@ -13,7 +13,9 @@ import { useEffect, useRef, useState } from 'react'
 
 export type LiveStatus = 'idle' | 'running' | 'complete'
 export type AgentRunStatus = 'pending' | 'running' | 'complete'
-export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
+// `idle` = no active investigation to stream (healthy standby), distinct from
+// `disconnected` = an SSE stream that actually dropped.
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected' | 'idle'
 
 export interface LiveAgent {
   role: string
@@ -65,7 +67,9 @@ export interface LiveInvestigation {
 }
 
 export function useLiveInvestigation(incidentId: string): LiveInvestigation {
-  const [connection, setConnection] = useState<ConnectionStatus>('reconnecting')
+  // Initial state reflects whether there is anything to stream, so an idle
+  // dashboard never flashes RECONNECTING before settling to STANDBY.
+  const [connection, setConnection] = useState<ConnectionStatus>(incidentId ? 'reconnecting' : 'idle')
   const [status, setStatus] = useState<LiveStatus>('idle')
   const [agents, setAgents] = useState<LiveAgent[]>([])
   const [confidence, setConfidence] = useState<number | null>(null)
@@ -74,8 +78,9 @@ export function useLiveInvestigation(incidentId: string): LiveInvestigation {
 
   useEffect(() => {
     // No active incident → no stream, empty queue (never a fabricated roster).
+    // This is a healthy idle/standby state, NOT a dropped connection.
     if (!incidentId) {
-      setConnection('disconnected'); setStatus('idle'); setAgents([])
+      setConnection('idle'); setStatus('idle'); setAgents([])
       return
     }
     const url = `${STREAM_BASE}/api/incidents/${encodeURIComponent(incidentId)}/stream`
