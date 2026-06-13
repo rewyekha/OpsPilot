@@ -56,6 +56,15 @@ frontend/.env
 Thumbs.db
 
 # ──────────────────────────────────────────────
+# Large media — host demo videos externally (YouTube / Release asset), not in git.
+# GitHub hard-rejects files > 100 MB.
+# ──────────────────────────────────────────────
+*.mp4
+*.mov
+*.webm
+*.zip
+
+# ──────────────────────────────────────────────
 # Secrets (never commit)
 # ──────────────────────────────────────────────
 *.pem
