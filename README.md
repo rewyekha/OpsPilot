@@ -60,53 +60,11 @@ all streamed live to an Azure-Portal-style command centre over Server-Sent Event
 
 <div align="center">
 
-[![Watch the OpsPilot demo on YouTube](https://img.youtube.com/vi/YhKYpFUNweo/maxresdefault.jpg)](https://youtu.be/YhKYpFUNweo)
+[![Watch the OpsPilot demo on YouTube](docs/screenshots/architecture.png)](https://youtu.be/YhKYpFUNweo)
 
 ▶️ **[Watch the full demo on YouTube](https://youtu.be/YhKYpFUNweo)**
 
 </div>
-
-### Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/dashboard-1.png" width="85%" alt="Live command centre"><br>
-  <em>1 / 8 — Live incident command centre (Azure-Portal-style)</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/active-incident-1.png" width="85%" alt="Active incident"><br>
-  <em>2 / 8 — Active incident with live multi-agent investigation</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/agents.png" width="85%" alt="Specialist agents"><br>
-  <em>3 / 8 — Specialist agents investigating in parallel</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/RCA-agent.png" width="85%" alt="Root cause analysis"><br>
-  <em>4 / 8 — Confidence-scored root cause</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/rollback.png" width="85%" alt="Remediation"><br>
-  <em>5 / 8 — Ranked, executable remediations &amp; one-click rollback</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/analytics.png" width="85%" alt="Analytics"><br>
-  <em>6 / 8 — Operational analytics &amp; insights</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/demo-scenario.png" width="85%" alt="Demo scenarios"><br>
-  <em>7 / 8 — One-click demo scenarios (deterministic, judge-safe incidents)</em>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/history.png" width="85%" alt="Incident history"><br>
-  <em>8 / 8 — Incident history &amp; audit trail</em>
-</p>
 
 ---
 
