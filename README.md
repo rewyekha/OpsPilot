@@ -12,9 +12,6 @@ timeline, determine a **confidence-scored root cause**, and propose ranked,
 executable remediations — all streamed live to an Azure-Portal-style command
 centre over Server-Sent Events.
 
-The application code lives in [`opspilot/`](opspilot/). Start there:
-[`opspilot/README.md`](opspilot/README.md) · [`opspilot/docs/JUDGES_GUIDE.md`](opspilot/docs/JUDGES_GUIDE.md).
-
 ---
 
 ## The differentiator: confidence-gated reasoning escalation
@@ -47,13 +44,12 @@ OpsPilot runs in **zero-credential mock mode by default** — no Azure account
 needed to evaluate the full experience. All paths below open the app at
 **http://localhost:3000**.
 
-> First, in every path: `cd opspilot && cp .env.example .env`
+> First, from the repository root: `cp .env.example .env`
 > The defaults in `.env.example` select mock mode, so this just works.
 
 ### Option A — Prebuilt images from GHCR (fastest, no build)
 
 ```bash
-cd opspilot
 cp .env.example .env
 docker compose -f docker-compose.ghcr.yml up
 ```
@@ -68,7 +64,6 @@ docker pull ghcr.io/rewyekha/opspilot-frontend:latest
 ### Option B — Build from source with Docker
 
 ```bash
-cd opspilot
 cp .env.example .env
 docker compose -f docker-compose.yml up --build
 ```
@@ -77,14 +72,14 @@ docker compose -f docker-compose.yml up --build
 
 ```bash
 # Backend (mock mode — no credentials)
-cd opspilot/backend && uvicorn app.main:app --port 8000
+cd backend && uvicorn app.main:app --port 8000
 # Frontend
-cd opspilot/frontend && npm install && npm run dev
+cd frontend && npm install && npm run dev
 ```
 
 ### Bring your own Azure AI Foundry credentials (live mode)
 
-Edit `opspilot/.env` and set:
+Edit `.env` and set:
 
 ```bash
 EXECUTION_MODE=foundry
@@ -95,7 +90,7 @@ SPECIALIST_MODEL_DEPLOYMENT=gpt-4o-mini
 REASONING_MODEL_DEPLOYMENT=o4-mini
 ```
 
-Then re-run any option above. See [`opspilot/backend/.env.example`](opspilot/backend/.env.example)
+Then re-run any option above. See [`backend/.env.example`](backend/.env.example)
 for the full list of supported variables (all optional except `FOUNDRY_ENDPOINT`
 in live mode).
 
@@ -118,15 +113,14 @@ Images are built and published automatically on every push to `main` by
 
 ```
 .
-├── opspilot/              # the application
-│   ├── backend/           # FastAPI + LangGraph agent runtime (Python 3.12)
-│   ├── frontend/          # React + TypeScript + Fluent UI v9
-│   ├── infra/             # Azure Bicep infrastructure-as-code
-│   ├── evaluation/        # Foundry evaluation datasets and runners
-│   ├── docs/              # architecture, judges' guide, readiness reports
-│   └── docker-compose*.yml
-├── docs/                  # planning notes and design history
-└── .github/workflows/     # CI/CD (Docker → GHCR)
+├── backend/            # FastAPI + LangGraph agent runtime (Python 3.12)
+├── frontend/           # React + TypeScript + Fluent UI v9
+├── infra/              # Azure Bicep infrastructure-as-code
+├── evaluation/         # Foundry evaluation datasets and runners
+├── demo-workloads/     # Sample apps used to generate real incidents
+├── docs/               # architecture diagram assets
+├── docker-compose*.yml # local / prebuilt run configurations
+└── .github/workflows/  # CI/CD (Docker → GHCR)
 ```
 
 ## Tech stack

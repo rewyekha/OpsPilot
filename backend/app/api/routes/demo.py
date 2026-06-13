@@ -71,7 +71,7 @@ _HEALTH_PATHS: dict[str, str] = {"album-api": "/albums"}
 
 
 def _scenarios_dir() -> Path:
-    # backend/app/api/routes/demo.py -> opspilot/infra/scripts/scenarios
+    # backend/app/api/routes/demo.py -> <repo-root>/infra/scripts/scenarios
     return Path(__file__).resolve().parents[3].parent / "infra" / "scripts" / "scenarios"
 
 

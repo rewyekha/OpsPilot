@@ -26,10 +26,10 @@ jobs:
       matrix:
         include:
           - image: opspilot-backend
-            context: opspilot/backend
+            context: backend
             build-args: ""
           - image: opspilot-frontend
-            context: opspilot/frontend
+            context: frontend
             # Empty base URL => same-origin relative API calls, proxied by nginx.
             build-args: |
               VITE_API_BASE_URL=

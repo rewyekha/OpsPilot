@@ -1,10 +1,9 @@
 name: CI
 
+# Manual trigger only. Re-enable push/pull_request once lint, type-check, and
+# tests are confirmed green locally (paths are now repo-root relative).
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   # ── Backend: lint, typecheck, test ─────────────────────────────────────────

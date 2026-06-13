@@ -1,7 +1,6 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Run OpsPilot from prebuilt images on GitHub Container Registry — no build step.
 #
-#   cd opspilot
 #   cp .env.example .env          # defaults run in zero-credential mock mode
 #   docker compose -f docker-compose.ghcr.yml up
 #   open http://localhost:3000
