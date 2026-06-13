@@ -19,6 +19,14 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://github.com/rewyekha?tab=packages)
 
+<br>
+
+**Author — Reyas Khan**
+
+[![GitHub](https://img.shields.io/badge/GitHub-rewyekha-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rewyekha)
+[![Portfolio](https://img.shields.io/badge/Portfolio-reyaskhan.me-1E90FF?style=for-the-badge&logo=googlechrome&logoColor=white)](https://reyaskhan.me)
+[![Microsoft Learn](https://img.shields.io/badge/Microsoft%20Learn-Profile-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://learn.microsoft.com/en-us/users/reyaskhanm-9092/)
+
 </div>
 
 ---
@@ -43,6 +51,57 @@ all streamed live to an Azure-Portal-style command centre over Server-Sent Event
 | Evidence gathering | Serial, manual | **Parallel, autonomous** |
 | Root cause | Tribal guess | **Confidence-scored hypothesis** |
 | Remediation | Ad hoc | **Ranked, executable fixes** |
+
+---
+
+## Demo
+
+> 📹 **Product walkthrough** — a full incident, from detection to resolution.
+
+_Demo video coming soon._
+
+<!-- ▶ ADD YOUR DEMO VIDEO HERE
+     Easiest method (recommended):
+       1. Open this README on github.com and click the ✏️ Edit (pencil) icon.
+       2. Drag-and-drop your .mp4 / .mov file onto the editor where you want it.
+       3. GitHub uploads it and inserts a player link automatically, like:
+            https://github.com/user-attachments/assets/xxxxxxxx-xxxx-xxxx
+       4. Delete the "Demo video coming soon." line above; keep the link on its own line.
+     YouTube alternative (thumbnail that links to the video):
+       [![Watch the demo](docs/screenshots/video-thumbnail.png)](https://youtu.be/YOUR_VIDEO_ID)
+-->
+
+### Screenshots
+
+_Screenshots coming soon._
+
+<!-- 🖼 ADD YOUR SCREENSHOTS HERE — they stack VERTICALLY with "n / N" captions.
+     1. Drop your PNG/JPG files into  docs/screenshots/  e.g.:
+          01-dashboard.png   02-investigation.png   03-root-cause.png   04-recommendations.png
+     2. Delete the "Screenshots coming soon." line above.
+     3. Remove THIS comment's opening/closing markers so the blocks below render.
+        (Add or delete <p>…</p> blocks so the count matches your number of images.)
+
+<p align="center">
+  <img src="docs/screenshots/01-dashboard.png" width="85%" alt="Live command centre"><br>
+  <em>1 / 4 — Live incident command centre</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/02-investigation.png" width="85%" alt="Parallel multi-agent investigation"><br>
+  <em>2 / 4 — Parallel multi-agent investigation</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/03-root-cause.png" width="85%" alt="Confidence-scored root cause"><br>
+  <em>3 / 4 — Confidence-scored root cause &amp; reasoning escalation</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/04-recommendations.png" width="85%" alt="Ranked remediations"><br>
+  <em>4 / 4 — Ranked, executable remediations</em>
+</p>
+-->
 
 ---
 
