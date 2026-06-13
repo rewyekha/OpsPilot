@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Run OpsPilot from prebuilt images on GitHub Container Registry — no build step.
+#
+#   cd opspilot
+#   cp .env.example .env          # defaults run in zero-credential mock mode
+#   docker compose -f docker-compose.ghcr.yml up
+#   open http://localhost:3000
+#
+# To run against live Azure AI Foundry, edit .env (set EXECUTION_MODE=foundry and
+# your FOUNDRY_ENDPOINT / FOUNDRY_API_KEY) before `up`. No source changes needed.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  # Browser-facing app. nginx serves the SPA and reverse-proxies /api + /health
+  # to the backend, so everything is same-origin (no CORS / CSP friction).
+  frontend:
+    image: ghcr.io/rewyekha/opspilot-frontend:latest
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - opspilot-net
+
+  api:
+    image: ghcr.io/rewyekha/opspilot-backend:latest
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - opspilot-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - opspilot-net
+
+networks:
+  opspilot-net:
+    driver: bridge

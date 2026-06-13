@@ -13,7 +13,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN pip install "poetry==$POETRY_VERSION"
 
 COPY pyproject.toml poetry.lock* ./
-RUN poetry install --only main --no-root
+# No poetry.lock is committed, so generate one at build time. This keeps the
+# image reproducible from pyproject.toml and still honors a lock file if present.
+RUN poetry lock --no-interaction && poetry install --only main --no-root --no-interaction
 
 COPY app/ ./app/
 COPY fixtures/ ./fixtures/
@@ -23,7 +25,7 @@ COPY fixtures/ ./fixtures/
 # ─────────────────────────────────────────────────────────────────────────────
 FROM base AS development
 
-RUN poetry install --no-root
+RUN poetry install --no-root --no-interaction
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
