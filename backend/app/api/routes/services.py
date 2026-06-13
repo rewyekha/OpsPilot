@@ -35,7 +35,11 @@ router = APIRouter(tags=["system"])
 # cache on every request, so a just-declared outage shows immediately regardless
 # of cache age.
 _HEALTH_TTL_SECONDS = 10.0
-_HEALTH_TIMEOUT_SECONDS = 2.0
+# A cold live Log Analytics roster (list_services + one query per service, incl.
+# DefaultAzureCredential token acquisition) routinely takes 3–6s. A 2s bound meant
+# the fetch never completed in azure mode, so the panel stayed permanently empty.
+# 8s lets the first fetch land; stale-while-revalidate keeps steady-state snappy.
+_HEALTH_TIMEOUT_SECONDS = 8.0
 _health_cache: tuple[float, list[ServiceHealth]] | None = None
 _health_lock = asyncio.Lock()
 
