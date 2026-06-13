@@ -58,50 +58,55 @@ all streamed live to an Azure-Portal-style command centre over Server-Sent Event
 
 > 📹 **Product walkthrough** — a full incident, from detection to resolution.
 
-_Demo video coming soon._
+<div align="center">
 
-<!-- ▶ ADD YOUR DEMO VIDEO HERE
-     Easiest method (recommended):
-       1. Open this README on github.com and click the ✏️ Edit (pencil) icon.
-       2. Drag-and-drop your .mp4 / .mov file onto the editor where you want it.
-       3. GitHub uploads it and inserts a player link automatically, like:
-            https://github.com/user-attachments/assets/xxxxxxxx-xxxx-xxxx
-       4. Delete the "Demo video coming soon." line above; keep the link on its own line.
-     YouTube alternative (thumbnail that links to the video):
-       [![Watch the demo](docs/screenshots/video-thumbnail.png)](https://youtu.be/YOUR_VIDEO_ID)
--->
+[![Watch the OpsPilot demo on YouTube](https://img.youtube.com/vi/YhKYpFUNweo/maxresdefault.jpg)](https://youtu.be/YhKYpFUNweo)
+
+▶️ **[Watch the full demo on YouTube](https://youtu.be/YhKYpFUNweo)**
+
+</div>
 
 ### Screenshots
 
-_Screenshots coming soon._
-
-<!-- 🖼 ADD YOUR SCREENSHOTS HERE — they stack VERTICALLY with "n / N" captions.
-     1. Drop your PNG/JPG files into  docs/screenshots/  e.g.:
-          01-dashboard.png   02-investigation.png   03-root-cause.png   04-recommendations.png
-     2. Delete the "Screenshots coming soon." line above.
-     3. Remove THIS comment's opening/closing markers so the blocks below render.
-        (Add or delete <p>…</p> blocks so the count matches your number of images.)
-
 <p align="center">
-  <img src="docs/screenshots/01-dashboard.png" width="85%" alt="Live command centre"><br>
-  <em>1 / 4 — Live incident command centre</em>
+  <img src="docs/screenshots/dashboard-1.png" width="85%" alt="Live command centre"><br>
+  <em>1 / 8 — Live incident command centre (Azure-Portal-style)</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/02-investigation.png" width="85%" alt="Parallel multi-agent investigation"><br>
-  <em>2 / 4 — Parallel multi-agent investigation</em>
+  <img src="docs/screenshots/active-incident-1.png" width="85%" alt="Active incident"><br>
+  <em>2 / 8 — Active incident with live multi-agent investigation</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/03-root-cause.png" width="85%" alt="Confidence-scored root cause"><br>
-  <em>3 / 4 — Confidence-scored root cause &amp; reasoning escalation</em>
+  <img src="docs/screenshots/agents.png" width="85%" alt="Specialist agents"><br>
+  <em>3 / 8 — Specialist agents investigating in parallel</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/04-recommendations.png" width="85%" alt="Ranked remediations"><br>
-  <em>4 / 4 — Ranked, executable remediations</em>
+  <img src="docs/screenshots/RCA-agent.png" width="85%" alt="Root cause analysis"><br>
+  <em>4 / 8 — Confidence-scored root cause</em>
 </p>
--->
+
+<p align="center">
+  <img src="docs/screenshots/rollback.png" width="85%" alt="Remediation"><br>
+  <em>5 / 8 — Ranked, executable remediations &amp; one-click rollback</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/analytics.png" width="85%" alt="Analytics"><br>
+  <em>6 / 8 — Operational analytics &amp; insights</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/demo-scenario.png" width="85%" alt="Demo scenarios"><br>
+  <em>7 / 8 — One-click demo scenarios (deterministic, judge-safe incidents)</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/history.png" width="85%" alt="Incident history"><br>
+  <em>8 / 8 — Incident history &amp; audit trail</em>
+</p>
 
 ---
 
@@ -163,7 +168,7 @@ docker compose -f docker-compose.yml up --build
 ### Option C — Local dev (hot reload)
 
 ```bash
-cd backend && uvicorn app.main:app --port 8000   # mock mode, no credentials
+cd backend && python -m uvicorn app.main:app --reload --port 8000  # mock mode, no credentials
 cd frontend && npm install && npm run dev
 ```
 
